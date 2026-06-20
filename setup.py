@@ -1,9 +1,15 @@
 from datetime import datetime
-from connection import obtener_bd
 from models import Proveedor, Sede, Estudiante, Consumo, crear_colecciones
+from connection import obtener_bd
+from services import ProveedorService, SedeService, EstudianteService, ConsumoService
 
 db = obtener_bd()
 crear_colecciones(db)
+
+proveedor_svc = ProveedorService()
+sede_svc = SedeService()
+estudiante_svc = EstudianteService()
+consumo_svc = ConsumoService()
 
 proveedor1 = Proveedor(
     nombre_empresa="Distribuidora ABC",
@@ -11,11 +17,10 @@ proveedor1 = Proveedor(
     contacto_nombre="Carlos Pérez",
     telefono="3001234567",
     correo="contacto@abc.com",
-    productos_suministrados=["arroz", "pollo", "verduras"],
     frecuencia_entrega="Semanal",
     estado_activo=True
 )
-db.proveedores.insert_one(proveedor1.to_dict())
+proveedor_svc.insertar(proveedor1)
 print("Proveedor insertado:", proveedor1._id)
 
 sede1 = Sede(
@@ -27,7 +32,7 @@ sede1 = Sede(
     estado_activo=True,
     proveedor_id=proveedor1._id
 )
-db.sedes.insert_one(sede1.to_dict())
+sede_svc.insertar(sede1)
 print("Sede insertada:", sede1._id)
 
 estudiante1 = Estudiante(
@@ -44,7 +49,7 @@ estudiante1 = Estudiante(
     tipo_almuerzo="Normal",
     subsidio_activo=True
 )
-db.estudiantes.insert_one(estudiante1.to_dict())
+estudiante_svc.insertar(estudiante1)
 print("Estudiante insertado:", estudiante1._id)
 
 consumo1 = Consumo(
@@ -54,11 +59,11 @@ consumo1 = Consumo(
     hora_ingreso="12:30",
     validacion_identidad=True
 )
-db.consumos.insert_one(consumo1.to_dict())
+consumo_svc.insertar(consumo1)
 print("Consumo insertado:", consumo1._id)
 
 print("\n--- Resumen de documentos ---")
-print("Proveedores:", db.proveedores.count_documents({}))
-print("Sedes:", db.sedes.count_documents({}))
-print("Estudiantes:", db.estudiantes.count_documents({}))
-print("Consumos:", db.consumos.count_documents({}))
+print("Proveedores:", len(proveedor_svc.obtener_todos()))
+print("Sedes:", len(sede_svc.obtener_todos()))
+print("Estudiantes:", len(estudiante_svc.obtener_todos()))
+print("Consumos:", len(consumo_svc.obtener_todos()))

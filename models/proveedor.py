@@ -22,7 +22,7 @@ class Proveedor:
     }
 
     def __init__(self, nombre_empresa, nit, telefono, correo, estado_activo=True,
-                 contacto_nombre=None, productos_suministrados=None,
+                 contacto_nombre=None,
                  frecuencia_entrega=None, _id=None):
         self._id = _id or ObjectId()
         self.nombre_empresa = nombre_empresa
@@ -30,7 +30,6 @@ class Proveedor:
         self.contacto_nombre = contacto_nombre
         self.telefono = telefono
         self.correo = correo
-        self.productos_suministrados = productos_suministrados or []
         self.frecuencia_entrega = frecuencia_entrega
         self.estado_activo = estado_activo
 
