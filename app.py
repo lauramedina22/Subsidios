@@ -25,26 +25,28 @@ for k, v in _INIT.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ── MongoDB connection (graceful) ──
-try:
+# ── Servicios cacheados (solo se crean UNA VEZ) ──
+@st.cache_resource
+def _init_servicios():
     db = obtener_bd()
     crear_colecciones(db)
-except Exception as e:
-    st.session_state.db_error = str(e)
-    db = None
+    return (
+        ProveedorService(),
+        SedeService(),
+        EstudianteService(),
+        ConsumoService(),
+    )
 
-if db is not None:
-    proveedor_svc = ProveedorService()
-    sede_svc = SedeService()
-    estudiante_svc = EstudianteService()
-    consumo_svc = ConsumoService()
+try:
+    proveedor_svc, sede_svc, estudiante_svc, consumo_svc = _init_servicios()
     svc_map = {
         "Proveedores": proveedor_svc,
         "Sedes": sede_svc,
         "Estudiantes": estudiante_svc,
         "Consumos": consumo_svc,
     }
-else:
+except Exception as e:
+    st.session_state.db_error = str(e)
     proveedor_svc = sede_svc = estudiante_svc = consumo_svc = None
     svc_map = {}
 
@@ -234,9 +236,8 @@ def form_proveedor():
             cancelar_form()
 
 
-def form_sede():
+def form_sede(proveedores_lista):
     tit = "Editar sede" if st.session_state.modo_form == "editar" else "Nueva sede"
-    proveedores_lista = proveedor_svc.obtener_todos()
     prov_opts = {str(p._id): p.nombre_empresa for p in proveedores_lista}
     edit_prov_str = str(st.session_state.get("edit_proveedor_id", ""))
     prov_keys = list(prov_opts.keys())
@@ -330,11 +331,9 @@ def form_estudiante():
             cancelar_form()
 
 
-def form_consumo():
+def form_consumo(estudiantes_lista, sedes_lista):
     tit = "Editar consumo" if st.session_state.modo_form == "editar" else "Nuevo consumo"
-    estudiantes_lista = estudiante_svc.obtener_todos()
     opts_est = {str(e._id): f"{e.nombre_completo} ({e.codigo_estudiante})" for e in estudiantes_lista}
-    sedes_lista = sede_svc.obtener_todos()
     opts_sede = {str(s._id): s.nombre_sede for s in sedes_lista}
 
     with st.form("form_consumo"):
@@ -401,6 +400,8 @@ def seccion_proveedores():
 
 def seccion_sedes():
     todos = sede_svc.obtener_todos()
+    proveedores_lista = proveedor_svc.obtener_todos()  # una sola consulta, reutilizada abajo
+
     st.markdown('<h2 style="margin-bottom:4px;">Sedes</h2>', unsafe_allow_html=True)
     m1, m2, m3 = st.columns(3)
     with m1: render_stat_card("building", len(todos), "Total sedes", "#1B4079")
@@ -408,7 +409,7 @@ def seccion_sedes():
     with m3: render_stat_card("door-open", sum(s.cupos_disponibles or 0 for s in todos), "Cupos disponibles", "#5C6470")
 
     if st.session_state.show_form:
-        form_sede()
+        form_sede(proveedores_lista)
     else:
         if st.button("+ Agregar sede", key="btn_agregar_sede", type="primary"):
             limpiar_edit()
@@ -416,7 +417,7 @@ def seccion_sedes():
             st.session_state.show_form = True
             st.rerun()
 
-    prov_lookup = {str(p._id): p.nombre_empresa for p in proveedor_svc.obtener_todos()}
+    prov_lookup = {str(p._id): p.nombre_empresa for p in proveedores_lista}
     render_tabla(
         todos,
         [("Sede", 2, "nombre_sede"), ("Ubicación", 1, "ubicacion"),
@@ -433,7 +434,7 @@ def seccion_estudiantes():
     m1, m2, m3 = st.columns(3)
     with m1: render_stat_card("user-graduate", len(todos), "Total estudiantes", "#1B4079")
     with m2: render_stat_card("check-circle", sum(1 for e in todos if e.subsidio_activo), "Subsidio activo", "#C9A227")
-    with m3: render_stat_card("layer-group", sum(1 for e in todos if e.estrato in [1, 2]), "Estratos 1-2", "#5C6470")
+    with m3: render_stat_card("ban", sum(1 for e in todos if not e.subsidio_activo), "Inactivos", "#5C6470")
 
     if st.session_state.show_form:
         form_estudiante()
@@ -455,7 +456,10 @@ def seccion_estudiantes():
 
 def seccion_consumos():
     todos = consumo_svc.obtener_todos()
+    estudiantes_lista = estudiante_svc.obtener_todos()  # una sola consulta, reutilizada abajo
+    sedes_lista = sede_svc.obtener_todos()              # una sola consulta, reutilizada abajo
     hoy = datetime.now().date()
+
     st.markdown('<h2 style="margin-bottom:4px;">Consumos</h2>', unsafe_allow_html=True)
     m1, m2, m3 = st.columns(3)
     with m1: render_stat_card("utensils", len(todos), "Total consumos", "#1B4079")
@@ -463,7 +467,7 @@ def seccion_consumos():
     with m3: render_stat_card("calendar-day", sum(1 for c in todos if c.fecha_consumo and c.fecha_consumo.date() == hoy), "Hoy", "#5C6470")
 
     if st.session_state.show_form:
-        form_consumo()
+        form_consumo(estudiantes_lista, sedes_lista)
     else:
         if st.button("+ Agregar consumo", key="btn_agregar_consumo", type="primary"):
             limpiar_edit()
@@ -471,8 +475,8 @@ def seccion_consumos():
             st.session_state.show_form = True
             st.rerun()
 
-    est_lookup = {str(e._id): e.nombre_completo for e in estudiante_svc.obtener_todos()}
-    sede_lookup = {str(s._id): s.nombre_sede for s in sede_svc.obtener_todos()}
+    est_lookup = {str(e._id): e.nombre_completo for e in estudiantes_lista}
+    sede_lookup = {str(s._id): s.nombre_sede for s in sedes_lista}
     render_tabla(
         todos,
         [("Estudiante", 2, "estudiante_id"), ("Sede", 2, "sede_id"),

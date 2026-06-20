@@ -244,7 +244,8 @@ def aplicar_estilos():
     """, unsafe_allow_html=True)
 
 
-def mostrar_header():
+@st.cache_data(show_spinner=False)
+def _render_header_html():
     img = ""
     for ext in ["png", "svg", "jpg", "jpeg"]:
         path = f"icons/logo.{ext}"
@@ -254,7 +255,7 @@ def mostrar_header():
             mime = "svg+xml" if ext == "svg" else ext
             img = f'<img src="data:image/{mime};base64,{b64}" style="height:56px; margin-right:16px;">'
             break
-    st.markdown(f"""
+    return f"""
     <div style="display:flex;align-items:center;padding:8px 0 4px 0;">
         {img}
         <div>
@@ -262,7 +263,11 @@ def mostrar_header():
         </div>
     </div>
     <div style="background:linear-gradient(90deg,#C9A227 0%,#0B2545 100%);height:3px;border:none;margin:8px 0 24px 0;border-radius:2px;"></div>
-    """, unsafe_allow_html=True)
+    """
+
+
+def mostrar_header():
+    st.markdown(_render_header_html(), unsafe_allow_html=True)
 
 
 def render_stat_card(icon, value, label, bg_color):
