@@ -2,6 +2,25 @@ from bson import ObjectId
 
 
 class Proveedor:
+    coleccion = "proveedores"
+
+    schema = {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["nombre_empresa", "nit", "telefono", "correo", "estado_activo"],
+            "properties": {
+                "nombre_empresa": {"bsonType": "string"},
+                "nit": {"bsonType": "string"},
+                "contacto_nombre": {"bsonType": "string"},
+                "telefono": {"bsonType": "string"},
+                "correo": {"bsonType": "string"},
+                "productos_suministrados": {"bsonType": "array", "items": {"bsonType": "string"}},
+                "frecuencia_entrega": {"bsonType": "string"},
+                "estado_activo": {"bsonType": "bool"}
+            }
+        }
+    }
+
     def __init__(self, nombre_empresa, nit, telefono, correo, estado_activo=True,
                  contacto_nombre=None, productos_suministrados=None,
                  frecuencia_entrega=None, _id=None):

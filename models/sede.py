@@ -2,6 +2,24 @@ from bson import ObjectId
 
 
 class Sede:
+    coleccion = "sedes"
+
+    schema = {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["nombre_sede", "ubicacion", "capacidad_maxima", "estado_activo", "proveedor_id"],
+            "properties": {
+                "nombre_sede": {"bsonType": "string"},
+                "ubicacion": {"bsonType": "string"},
+                "capacidad_maxima": {"bsonType": "int"},
+                "cupos_disponibles": {"bsonType": "int"},
+                "horario_atencion": {"bsonType": "string"},
+                "estado_activo": {"bsonType": "bool"},
+                "proveedor_id": {"bsonType": "objectId"}
+            }
+        }
+    }
+
     def __init__(self, nombre_sede, ubicacion, capacidad_maxima, estado_activo,
                  proveedor_id, cupos_disponibles=None, horario_atencion=None, _id=None):
         self._id = _id or ObjectId()

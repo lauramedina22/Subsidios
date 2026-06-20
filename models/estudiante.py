@@ -2,6 +2,29 @@ from bson import ObjectId
 
 
 class Estudiante:
+    coleccion = "estudiantes"
+
+    schema = {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["codigo_estudiante", "nombre_completo", "correo", "subsidio_activo"],
+            "properties": {
+                "codigo_estudiante": {"bsonType": "string"},
+                "nombre_completo": {"bsonType": "string"},
+                "correo": {"bsonType": "string"},
+                "telefono": {"bsonType": "string"},
+                "facultad": {"bsonType": "string"},
+                "programa": {"bsonType": "string"},
+                "semestre": {"bsonType": "int"},
+                "estrato": {"bsonType": "int"},
+                "fecha_inicio_subsidio": {"bsonType": "date"},
+                "fecha_fin_subsidio": {"bsonType": "date"},
+                "tipo_almuerzo": {"bsonType": "string"},
+                "subsidio_activo": {"bsonType": "bool"}
+            }
+        }
+    }
+
     def __init__(self, codigo_estudiante, nombre_completo, correo, subsidio_activo,
                  telefono=None, facultad=None, programa=None, semestre=None,
                  estrato=None, fecha_inicio_subsidio=None, fecha_fin_subsidio=None,
@@ -19,8 +42,7 @@ class Estudiante:
         self.fecha_fin_subsidio = fecha_fin_subsidio
         self.tipo_almuerzo = tipo_almuerzo
         self.subsidio_activo = subsidio_activo
-        
-    # Método para convertir el objeto a un diccionario (útil para MongoDB)
+
     def to_dict(self):
         return {k: v for k, v in self.__dict__.items() if v is not None}
 

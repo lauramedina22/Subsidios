@@ -2,6 +2,23 @@ from bson import ObjectId
 
 
 class Consumo:
+    coleccion = "consumos"
+
+    schema = {
+        "$jsonSchema": {
+            "bsonType": "object",
+            "required": ["estudiante_id", "sede_id", "fecha_consumo", "validacion_identidad"],
+            "properties": {
+                "estudiante_id": {"bsonType": "objectId"},
+                "sede_id": {"bsonType": "objectId"},
+                "menu_id": {"bsonType": "objectId"},
+                "fecha_consumo": {"bsonType": "date"},
+                "hora_ingreso": {"bsonType": "string"},
+                "validacion_identidad": {"bsonType": "bool"}
+            }
+        }
+    }
+
     def __init__(self, estudiante_id, sede_id, fecha_consumo, validacion_identidad,
                  menu_id=None, hora_ingreso=None, _id=None):
         self._id = _id or ObjectId()
