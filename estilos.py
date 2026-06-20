@@ -29,12 +29,12 @@ def aplicar_estilos():
         [data-testid="stSidebar"] [role="radiogroup"] {
             display: flex !important;
             flex-direction: column !important;
-            gap: 0 !important;
+            gap: 28px !important;
             padding: 0 !important;
         }
         [data-testid="stSidebar"] [role="radio"] {
             background: transparent !important;
-            padding: 7px 18px !important;
+            padding: 14px 18px !important;
             border-radius: 0 !important;
             font-family: 'Inter', sans-serif !important;
             font-weight: 500 !important;
@@ -64,7 +64,7 @@ def aplicar_estilos():
         div[data-testid="stSidebar"] .stRadio > div { gap: 0; }
         div[data-testid="stSidebar"] .stRadio label {
             background: transparent !important;
-            padding: 7px 18px !important;
+            padding: 14px 18px !important;
             border-radius: 0 !important;
             font-family: 'Inter', sans-serif;
             font-weight: 500;
@@ -244,30 +244,55 @@ def aplicar_estilos():
     """, unsafe_allow_html=True)
 
 
-@st.cache_data(show_spinner=False)
-def _render_header_html():
-    img = ""
-    for ext in ["png", "svg", "jpg", "jpeg"]:
-        path = f"icons/logo.{ext}"
+def mostrar_header():
+    import os, base64
+    b64 = ""
+    mime = ""
+    for path in ["icons/comedor_hero.jpg", "icons/comedor_hero.jpeg", "icons/comedor_banner.jpg", "icons/comedor.png", "icons/comedor.jpg"]:
         if os.path.exists(path):
             with open(path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode()
+            ext = path.rsplit(".", 1)[-1]
             mime = "svg+xml" if ext == "svg" else ext
-            img = f'<img src="data:image/{mime};base64,{b64}" style="height:56px; margin-right:16px;">'
             break
-    return f"""
-    <div style="display:flex;align-items:center;padding:8px 0 4px 0;">
-        {img}
-        <div>
-            <h1 style="margin:0;font-size:1.5rem;">Sistema de Subsidio de Alimentación</h1>
+    img_url = f"data:image/{mime};base64,{b64}" if b64 else ""
+    st.markdown(f"""
+    <div style="
+        position:relative;
+        margin:-1rem -1rem 24px -1rem;
+        height:260px;
+        overflow:hidden;
+        border-radius:0 0 24px 24px;
+    ">
+        <img src="{img_url}" alt="" style="
+            position:absolute;
+            inset:0;
+            width:100%;
+            height:100%;
+            object-fit:cover;
+        ">
+        <div style="
+            position:absolute;
+            inset:0;
+            background:linear-gradient(rgba(11,37,69,0.35), rgba(11,37,69,0.25));
+        "></div>
+        <div style="
+            position:absolute;
+            left:40px;
+            bottom:36px;
+            color:white;
+            z-index:10;
+        ">
+            <div style="font-family:'Inter',sans-serif;font-weight:600;letter-spacing:0.03em;font-size:0.95rem;margin-bottom:8px;">
+                Sistema de Subsidio de Alimentación
+            </div>
+            <div style="width:420px;height:3px;background:#C9A227;border-radius:10px;margin-bottom:14px;"></div>
+            <div style="font-size:3rem;font-weight:700;color:white;font-family:'Source Serif 4', serif;">
+                Bienestar Universitario
+            </div>
         </div>
     </div>
-    <div style="background:linear-gradient(90deg,#C9A227 0%,#0B2545 100%);height:3px;border:none;margin:8px 0 24px 0;border-radius:2px;"></div>
-    """
-
-
-def mostrar_header():
-    st.markdown(_render_header_html(), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 
 def render_stat_card(icon, value, label, bg_color):
