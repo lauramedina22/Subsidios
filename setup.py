@@ -1,19 +1,11 @@
-"""
-setup_db.py
-Crea las colecciones del sistema de subsidio de alimentación
-e inserta documentos de ejemplo, respetando las referencias
-entre Estudiante, Sedes, Proveedores y Consumo.
-
-Ejecutar una sola vez con: python setup_db.py
-"""
-
 from datetime import datetime
 from connection import obtener_bd
+from models import Proveedor, Sede, Estudiante, Consumo
 
 db = obtener_bd()
 
 # -------------------------------------------------------------
-# 1. PROVEEDORES (no depende de nadie)
+# 1. PROVEEDORES
 # -------------------------------------------------------------
 db.create_collection("proveedores", validator={
     "$jsonSchema": {
@@ -25,30 +17,28 @@ db.create_collection("proveedores", validator={
             "contacto_nombre": {"bsonType": "string"},
             "telefono": {"bsonType": "string"},
             "correo": {"bsonType": "string"},
-            "productos_suministrados": {
-                "bsonType": "array",
-                "items": {"bsonType": "string"}
-            },
+            "productos_suministrados": {"bsonType": "array", "items": {"bsonType": "string"}},
             "frecuencia_entrega": {"bsonType": "string"},
             "estado_activo": {"bsonType": "bool"}
         }
     }
 }) if "proveedores" not in db.list_collection_names() else None
 
-proveedor1 = db.proveedores.insert_one({
-    "nombre_empresa": "Distribuidora ABC",
-    "nit": "900123456-7",
-    "contacto_nombre": "Carlos Pérez",
-    "telefono": "3001234567",
-    "correo": "contacto@abc.com",
-    "productos_suministrados": ["arroz", "pollo", "verduras"],
-    "frecuencia_entrega": "Semanal",
-    "estado_activo": True
-})
-print("Proveedor insertado:", proveedor1.inserted_id)
+proveedor1 = Proveedor(
+    nombre_empresa="Distribuidora ABC",
+    nit="900123456-7",
+    contacto_nombre="Carlos Pérez",
+    telefono="3001234567",
+    correo="contacto@abc.com",
+    productos_suministrados=["arroz", "pollo", "verduras"],
+    frecuencia_entrega="Semanal",
+    estado_activo=True
+)
+db.proveedores.insert_one(proveedor1.to_dict())
+print("Proveedor insertado:", proveedor1._id)
 
 # -------------------------------------------------------------
-# 2. SEDES (depende de proveedores -> proveedor_id)
+# 2. SEDES
 # -------------------------------------------------------------
 db.create_collection("sedes", validator={
     "$jsonSchema": {
@@ -66,20 +56,21 @@ db.create_collection("sedes", validator={
     }
 }) if "sedes" not in db.list_collection_names() else None
 
-sede1 = db.sedes.insert_one({
-    "nombre_sede": "Cafetería Central",
-    "ubicacion": "Bloque 5",
-    "capacidad_maxima": 200,
-    "cupos_disponibles": 180,
-    "horario_atencion": "11:00 - 14:00",
-    "estado_activo": True,
-    "proveedor_id": proveedor1.inserted_id  # <-- referencia
-})
-print("Sede insertada:", sede1.inserted_id)
+sede1 = Sede(
+    nombre_sede="Cafetería Central",
+    ubicacion="Bloque 5",
+    capacidad_maxima=200,
+    cupos_disponibles=180,
+    horario_atencion="11:00 - 14:00",
+    estado_activo=True,
+    proveedor_id=proveedor1._id
+)
+db.sedes.insert_one(sede1.to_dict())
+print("Sede insertada:", sede1._id)
 
-# -------------------------------------------------------------
-# 3. ESTUDIANTES (no depende de otras colecciones)
-# -------------------------------------------------------------
+
+# 3. ESTUDIANTES
+
 db.create_collection("estudiantes", validator={
     "$jsonSchema": {
         "bsonType": "object",
@@ -101,25 +92,26 @@ db.create_collection("estudiantes", validator={
     }
 }) if "estudiantes" not in db.list_collection_names() else None
 
-estudiante1 = db.estudiantes.insert_one({
-    "codigo_estudiante": "2021145632",
-    "nombre_completo": "María Gómez",
-    "correo": "maria.gomez@uni.edu",
-    "telefono": "3109876543",
-    "facultad": "Ingeniería",
-    "programa": "Ingeniería de Sistemas",
-    "semestre": 6,
-    "estrato": 2,
-    "fecha_inicio_subsidio": datetime(2026, 1, 20),
-    "fecha_fin_subsidio": datetime(2026, 6, 15),
-    "tipo_almuerzo": "Normal",
-    "subsidio_activo": True
-})
-print("Estudiante insertado:", estudiante1.inserted_id)
+estudiante1 = Estudiante(
+    codigo_estudiante="2021145632",
+    nombre_completo="María Gómez",
+    correo="maria.gomez@uni.edu",
+    telefono="3109876543",
+    facultad="Ingeniería",
+    programa="Ingeniería de Sistemas",
+    semestre=6,
+    estrato=2,
+    fecha_inicio_subsidio=datetime(2026, 1, 20),
+    fecha_fin_subsidio=datetime(2026, 6, 15),
+    tipo_almuerzo="Normal",
+    subsidio_activo=True
+)
+db.estudiantes.insert_one(estudiante1.to_dict())
+print("Estudiante insertado:", estudiante1._id)
 
-# -------------------------------------------------------------
-# 4. CONSUMOS (depende de estudiantes Y sedes)
-# -------------------------------------------------------------
+
+# 4. CONSUMOS
+
 db.create_collection("consumos", validator={
     "$jsonSchema": {
         "bsonType": "object",
@@ -135,17 +127,16 @@ db.create_collection("consumos", validator={
     }
 }) if "consumos" not in db.list_collection_names() else None
 
-consumo1 = db.consumos.insert_one({
-    "estudiante_id": estudiante1.inserted_id,  # <-- referencia
-    "sede_id": sede1.inserted_id,              # <-- referencia
-    "fecha_consumo": datetime(2026, 6, 20),
-    "hora_ingreso": "12:30",
-    "validacion_identidad": True
-})
-print("Consumo insertado:", consumo1.inserted_id)
+consumo1 = Consumo(
+    estudiante_id=estudiante1._id,
+    sede_id=sede1._id,
+    fecha_consumo=datetime(2026, 6, 20),
+    hora_ingreso="12:30",
+    validacion_identidad=True
+)
+db.consumos.insert_one(consumo1.to_dict())
+print("Consumo insertado:", consumo1._id)
 
-# -------------------------------------------------------------
-# Resumen
 # -------------------------------------------------------------
 print("\n--- Resumen de documentos ---")
 print("Proveedores:", db.proveedores.count_documents({}))
