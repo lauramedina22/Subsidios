@@ -14,7 +14,6 @@ class Proveedor:
                 "contacto_nombre": {"bsonType": "string"},
                 "telefono": {"bsonType": "string"},
                 "correo": {"bsonType": "string"},
-                "productos_suministrados": {"bsonType": "array", "items": {"bsonType": "string"}},
                 "frecuencia_entrega": {"bsonType": "string"},
                 "estado_activo": {"bsonType": "bool"}
             }
