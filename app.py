@@ -693,29 +693,13 @@ def seccion_sedes():
         res = list(sede_svc.coleccion.aggregate(pipeline))
         cap_total = res[0]["total"] if res else 0
         render_stat_card("users", cap_total, "Capacidad total", "#C9A227")
-    with m3:
-        pipeline2 = [{"$group": {"_id": None, "total": {"$sum": "$cupos_disponibles"}}}]
-        res2 = list(sede_svc.coleccion.aggregate(pipeline2))
-        cupos_total = res2[0]["total"] if res2 else 0
-        render_stat_card("door-open", cupos_total, "Cupos disponibles", "#5C6470")
-
-    if st.session_state.show_form:
-        form_sede(proveedores_lista)
-    else:
-        if st.button("+ Agregar sede", key="btn_agregar_sede", type="primary"):
-            limpiar_edit()
-            st.session_state.modo_form = "crear"
-            st.session_state.show_form = True
-            st.rerun()
 
     prov_lookup = {str(p._id): p.nombre_empresa for p in proveedores_lista}
     render_tabla(
         todos,
         [("Sede", 2, "nombre_sede"), ("Ubicación", 1, "ubicacion"),
-         ("Capacidad", 1, "capacidad_maxima"), ("Cupos", 1, "cupos_disponibles"),
-         ("Proveedor", 1, "proveedor_id"), ("Activa", 1, "estado_activo")],
-        "_id", sede_svc,
-        lookup={"proveedor_id": prov_lookup}, seccion_key="sedes"
+         ("Capacidad", 1, "capacidad_maxima"), ("Activa", 1, "estado_activo")],
+        "_id", sede_svc, seccion_key="sedes"
     )
 
     nueva_pagina = render_paginacion(total, pagina, "sedes")
