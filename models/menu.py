@@ -2,15 +2,22 @@ from bson import ObjectId
 
 
 class Menu:
-    coleccion = "Menus_Diarios"
+    coleccion = "menus"
 
     schema = {
         "$jsonSchema": {
             "bsonType": "object",
             "required": ["sede_id", "fecha", "tipo_comida", "plato"],
             "properties": {
-                "sede_id":    {"bsonType": "objectId"},
-                "fecha":      {"bsonType": "string"},
+                "sede_id": {
+                    "bsonType": "object",
+                    "required": ["nombre_sede"],
+                    "properties": {
+                        "nombre_sede": {"bsonType": "string"},
+                        "ubicacion":   {"bsonType": "string"}
+                    }
+                },
+                "fecha":      {"bsonType": "date"},
                 "tipo_comida": {
                     "bsonType": "string",
                     "enum": ["carnivoro", "vegetariano"]
@@ -41,7 +48,7 @@ class Menu:
                  info_nutricional=None, ingredientes=None,
                  advertencia_alergias=None, _id=None):
         self._id                  = _id or ObjectId()
-        self.sede_id              = sede_id
+        self.sede_id              = sede_id     # dict embebido: {nombre_sede, ubicacion}
         self.fecha                = fecha
         self.tipo_comida          = tipo_comida
         self.plato                = plato

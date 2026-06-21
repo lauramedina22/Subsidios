@@ -2,7 +2,7 @@ from bson import ObjectId
 
 
 class Sede:
-    coleccion = "Sedes_Comedor"
+    coleccion = "sedes"
 
     schema = {
         "$jsonSchema": {
