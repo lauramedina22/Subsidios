@@ -109,7 +109,7 @@ with st.sidebar:
             logo_img = f'data:image/{mime};base64,{b64}'
             break
     if logo_img:
-        st.markdown(f'<div style="text-align:center;padding:16px 0 8px 0;"><img src="{logo_img}" style="max-width:80%;height:auto;"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center;padding:16px 0 0px 0;margin-bottom:20px;"><img src="{logo_img}" style="max-width:80%;height:auto;"></div>', unsafe_allow_html=True)
 
     seccion = st.radio(
         "Ir a",
