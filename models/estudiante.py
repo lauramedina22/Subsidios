@@ -49,3 +49,12 @@ class Estudiante:
     @classmethod
     def from_dict(cls, data):
         return cls(**data)
+    
+    
+    def obtener_pagina(self, pagina: int = 1, por_pagina: int = 30):
+        skip = (pagina - 1) * por_pagina
+        docs = self.coleccion.find().skip(skip).limit(por_pagina)
+        return [Estudiante.from_dict(doc) for doc in docs]
+
+    def contar(self) -> int:
+        return self.coleccion.count_documents({})

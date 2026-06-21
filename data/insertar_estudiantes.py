@@ -1,7 +1,7 @@
 """
 insertar_estudiantes.py
 Genera documentos en Estudiantes.
-Pool de ~58,900 estudiantes unicos x hasta 17 semestres (2018-1 al 2026-1).
+Pool de 50,000 estudiantes unicos x hasta 17 semestres (2018-1 al 2026-1).
 Cada estudiante cursa entre 1 y 12 semestres (duracion real de una
 carrera), empezando en un periodo aleatorio dentro del rango.
 
@@ -126,12 +126,11 @@ def insertar_estudiantes():
     col.delete_many({})
     print("Coleccion Estudiantes limpiada.")
 
-    BLOQUES_DE_GENERACION = 5      # cuantos lotes de poblacion se generan
-    TAMANO_BLOQUE = 25000          # estudiantes unicos generados por bloque
+    # === AJUSTE PARA LLEGAR AL LÍMITE ===
+    BLOQUES_DE_GENERACION = 2      # antes 5
+    TAMANO_BLOQUE = 25000          # se mantiene
     total_periodos = len(PERIODOS)
 
-    # Estimado real (varia porque cada estudiante dura entre 1 y 12 semestres,
-    # con 50% completando carrera larga de 8-12 semestres)
     promedio_semestres_estimado = 8.27
     total_est_aprox = int(BLOQUES_DE_GENERACION * TAMANO_BLOQUE * promedio_semestres_estimado)
 
@@ -159,37 +158,23 @@ def insertar_estudiantes():
             telefono  = f"3{random.randint(100000000, 999999999)}"
             facultad  = random.choice(FACULTADES)
             programa  = random.choice(PROGRAMAS[facultad])
-            estrato   = random.randint(1, 3)  # subsidio aplica estratos 1-3
+            estrato   = random.randint(1, 3)
             tipo      = random.choice(TIPO_ALMUERZO)
 
-            # Duracion real de la carrera: 50% completa carrera larga (8-12
-            # semestres, reclamando el subsidio casi toda la carrera),
-            # 50% duracion variada (1-12, entradas/salidas mas tempranas)
             if random.random() < 0.5:
                 duracion = random.randint(8, 12)
             else:
                 duracion = random.randint(1, 12)
 
-            # Periodo de inicio aleatorio, recortando si no le alcanzan
-            # los periodos restantes para completar su duracion
             max_inicio_idx = max(0, total_periodos - duracion)
             idx_inicio = random.randint(0, max_inicio_idx)
-
-            # En que semestre academico (1-12) inicio su carrera
             semestre_academico_inicio = random.randint(1, max(1, 12 - duracion + 1))
 
             for offset in range(duracion):
                 idx_periodo = idx_inicio + offset
                 periodo = PERIODOS[idx_periodo]
                 fecha_inicio, fecha_fin = SEMESTRES[periodo]
-
                 semestre_actual = min(12, semestre_academico_inicio + offset)
-
-                # subsidio_activo refleja el estado VIGENTE respecto a hoy
-                # (20 de junio 2026): solo esta activo si la fecha de hoy
-                # cae dentro del rango [fecha_inicio, fecha_fin] de ese
-                # semestre especifico. Semestres ya cerrados o futuros
-                # quedan en false.
                 subsidio_activo = fecha_inicio <= HOY <= fecha_fin
 
                 estudiante = Estudiante(
@@ -207,8 +192,7 @@ def insertar_estudiantes():
                     subsidio_activo       = subsidio_activo
                 )
 
-                doc = estudiante.to_dict()
-                batch.append(doc)
+                batch.append(estudiante.to_dict())
 
                 if len(batch) >= BATCH_SIZE:
                     col.insert_many(batch)

@@ -1,15 +1,39 @@
 """
 insertar_menus.py
 Genera e inserta documentos en Menus_Diarios.
-Por cada dia habil (lunes-viernes, sin festivos colombianos)
-entre 2020-01-01 y 2026-06-30, y por cada sede,
-se crean 2 menus: uno carnivoro y uno vegetariano.
+Por cada día hábil (lunes-viernes, sin festivos colombianos)
+que caiga dentro de algún semestre académico (según SEMESTRES),
+y por cada sede, se crean 2 menús: uno carnívoro y uno vegetariano.
 """
 
 import random
 from datetime import date, datetime, timedelta
 from connection import obtener_bd
 from models import Menu, Sede
+
+# ------------------------------------------------------------------
+# Semestres y fechas de inicio/fin (copiados de insertar_estudiantes)
+# ------------------------------------------------------------------
+SEMESTRES = {
+    "2018-1": (datetime(2018, 1, 22), datetime(2018, 6, 15)),
+    "2018-2": (datetime(2018, 7, 23), datetime(2018, 11, 30)),
+    "2019-1": (datetime(2019, 1, 21), datetime(2019, 6, 14)),
+    "2019-2": (datetime(2019, 7, 22), datetime(2019, 11, 29)),
+    "2020-1": (datetime(2020, 1, 20), datetime(2020, 6, 12)),
+    "2020-2": (datetime(2020, 7, 20), datetime(2020, 11, 27)),
+    "2021-1": (datetime(2021, 1, 18), datetime(2021, 6, 11)),
+    "2021-2": (datetime(2021, 7, 19), datetime(2021, 11, 26)),
+    "2022-1": (datetime(2022, 1, 17), datetime(2022, 6, 10)),
+    "2022-2": (datetime(2022, 7, 18), datetime(2022, 11, 25)),
+    "2023-1": (datetime(2023, 1, 16), datetime(2023, 6, 9)),
+    "2023-2": (datetime(2023, 7, 17), datetime(2023, 11, 24)),
+    "2024-1": (datetime(2024, 1, 15), datetime(2024, 6, 7)),
+    "2024-2": (datetime(2024, 7, 15), datetime(2024, 11, 22)),
+    "2025-1": (datetime(2025, 1, 20), datetime(2025, 6, 13)),
+    "2025-2": (datetime(2025, 7, 21), datetime(2025, 11, 28)),
+    "2026-1": (datetime(2026, 1, 19), datetime(2026, 7, 10)),
+}
+PERIODOS = list(SEMESTRES.keys())  # 17 periodos
 
 # ------------------------------------------------------------------
 # Festivos Colombia 2020-2026
@@ -217,20 +241,20 @@ INGREDIENTES_VEGETARIANO = [
 ALERGIAS_CARNIVORO   = [["gluten"], [], ["lactosa"], ["gluten", "lactosa"], [], [], [], []]
 ALERGIAS_VEGETARIANO = [["huevo"], [], ["soya"], ["gluten"], [], ["lactosa"], [], []]
 
-FECHA_INICIO = date(2020, 1, 1)
-FECHA_FIN    = date(2026, 6, 30)
-BATCH_SIZE   = 500
+BATCH_SIZE = 500
 
 
-def generar_fechas_habiles(inicio, fin):
-    """Genera fechas habiles (lunes-viernes, sin festivos) como datetime."""
-    fechas = []
-    actual = inicio
-    while actual <= fin:
-        if actual.weekday() < 5 and actual not in FESTIVOS:
-            fechas.append(datetime(actual.year, actual.month, actual.day))
-        actual += timedelta(days=1)
-    return fechas
+def generar_fechas_habiles_por_semestres(semestres):
+    """Genera todas las fechas hábiles (sin festivos) que caen dentro de
+    cualquier semestre definido en el diccionario semestres."""
+    fechas = set()
+    for periodo, (inicio, fin) in semestres.items():
+        actual = inicio
+        while actual <= fin:
+            if actual.weekday() < 5 and actual.date() not in FESTIVOS:
+                fechas.add(actual)
+            actual += timedelta(days=1)
+    return sorted(fechas)
 
 
 def insertar_menus():
@@ -249,9 +273,10 @@ def insertar_menus():
     col.delete_many({})
     print("Coleccion Menus_Diarios limpiada.")
 
-    fechas    = generar_fechas_habiles(FECHA_INICIO, FECHA_FIN)
+    fechas = generar_fechas_habiles_por_semestres(SEMESTRES)
     total_est = len(fechas) * len(sedes) * 2
-    print(f"Fechas habiles (sin festivos): {len(fechas)}")
+    print(f"Rango de fechas: {min(fechas).date()} a {max(fechas).date()}")
+    print(f"Fechas habiles (dentro de los semestres): {len(fechas)}")
     print(f"Sedes                        : {len(sedes)}")
     print(f"Total estimado               : {total_est:,} menus\n")
 
@@ -260,14 +285,11 @@ def insertar_menus():
 
     for fecha in fechas:
         for sede in sedes:
-
             sopa_c = random.choice(SOPAS_CARNIVORO)
             seco_c = random.choice(SECOS_CARNIVORO)
             sopa_v = random.choice(SOPAS_VEGETARIANO)
             seco_v = random.choice(SECOS_VEGETARIANO)
 
-            # sede_id como objeto embebido SOLO con nombre y ubicacion
-            # (sin el ObjectId real de la sede)
             embed_sede = {
                 "nombre_sede": sede["nombre_sede"],
                 "ubicacion":   sede.get("ubicacion", "")

@@ -12,10 +12,19 @@ class MenuService:
         self.coleccion.insert_one(menu.to_dict())
 
     def obtener_todos(self):
-        return list(self.coleccion.find())
+        return [Menu.from_dict(doc) for doc in self.coleccion.find()]
+
+    def obtener_pagina(self, pagina: int = 1, por_pagina: int = 30):
+        skip = (pagina - 1) * por_pagina
+        docs = self.coleccion.find().skip(skip).limit(por_pagina)
+        return [Menu.from_dict(doc) for doc in docs]
+
+    def contar(self) -> int:
+        return self.coleccion.count_documents({})
 
     def obtener_por_id(self, id):
-        return self.coleccion.find_one({"_id": ObjectId(id)})
+        doc = self.coleccion.find_one({"_id": ObjectId(id)})
+        return Menu.from_dict(doc) if doc else None
 
     def obtener_por_sede_y_fecha(self, sede_id, fecha):
         return list(self.coleccion.find({
