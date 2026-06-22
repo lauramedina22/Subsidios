@@ -56,5 +56,4 @@ class Consumo:
     @classmethod
     def from_dict(cls, data):
         data = dict(data)
-        data.pop("_id", None)
         return cls(**data)

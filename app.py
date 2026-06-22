@@ -428,6 +428,11 @@ def form_consumo(estudiantes_lista, sedes_lista):
     opts_est  = {str(e._id): f"{e.nombre_completo} ({e.codigo_estudiante})" for e in estudiantes_lista}
     opts_sede = {str(s._id): s.nombre_sede for s in sedes_lista}
 
+    def _idx(opts, edit_key):
+        val  = str(st.session_state.get(edit_key, ""))
+        keys = list(opts.keys())
+        return keys.index(val) if val in keys else 0
+
     with st.form("form_consumo"):
         st.markdown(
             f'<h3 style="color:#0B2545;font-family:\'Source Serif 4\',serif;'
@@ -436,38 +441,55 @@ def form_consumo(estudiantes_lista, sedes_lista):
         )
         c1, c2 = st.columns(2)
         with c1:
-            est_id_key = st.selectbox(
+            est_key = st.selectbox(
                 "Estudiante", options=list(opts_est.keys()),
-                format_func=lambda x: opts_est[x]
+                format_func=lambda x: opts_est[x],
+                index=_idx(opts_est, "edit_estudiante_id")
             ) if opts_est else None
-            sede_id_key = st.selectbox(
+            sede_key = st.selectbox(
                 "Sede", options=list(opts_sede.keys()),
-                format_func=lambda x: opts_sede[x]
+                format_func=lambda x: opts_sede[x],
+                index=_idx(opts_sede, "edit_sede_id")
             ) if opts_sede else None
         with c2:
-            fecha = st.date_input("Fecha consumo", datetime.now())
-            hora = st.text_input("Hora ingreso", "12:00")
-            validado = st.checkbox("Identidad validada", True)
+            fecha_default = st.session_state.get("edit_fecha_consumo")
+            if hasattr(fecha_default, "date"):
+                fecha_default = fecha_default.date()
+            elif fecha_default is None:
+                fecha_default = datetime.now().date()
+            fecha = st.date_input("Fecha consumo", fecha_default)
+            hora_default = st.session_state.get("edit_hora_ingreso", "12:00")
+            hora = st.text_input("Hora ingreso", hora_default or "12:00")
+            validado_default = st.session_state.get("edit_validacion_identidad", True)
+            validado = st.checkbox("Identidad validada", validado_default)
         cols = st.columns(2)
         if cols[0].form_submit_button(
             "Guardar" if st.session_state.modo_form == "crear" else "Actualizar", type="primary"
         ):
-            if est_id_key and sede_id_key:
+            if est_key and sede_key:
+                est_doc  = next((e for e in estudiantes_lista if str(e._id) == est_key), None)
+                sede_doc = next((s for s in sedes_lista      if str(s._id) == sede_key), None)
+                embed_est = {
+                    "nombre_completo":   est_doc.nombre_completo,
+                    "codigo_estudiante": est_doc.codigo_estudiante,
+                    "tipo_almuerzo":     est_doc.tipo_almuerzo,
+                }
+                embed_sede = {
+                    "nombre_sede": sede_doc.nombre_sede,
+                    "ubicacion":   sede_doc.ubicacion,
+                }
+                datos = {
+                    "estudiante_id": embed_est,
+                    "sede_id":       embed_sede,
+                    "fecha_consumo": datetime.combine(fecha, datetime.min.time()),
+                    "hora_ingreso":  hora,
+                    "validacion_identidad": validado,
+                }
                 if st.session_state.modo_form == "editar":
-                    consumo_svc.actualizar(st.session_state.id_edicion, {
-                        "estudiante_id": ObjectId(est_id_key),
-                        "sede_id": ObjectId(sede_id_key),
-                        "fecha_consumo": datetime.combine(fecha, datetime.min.time()),
-                        "hora_ingreso": hora, "validacion_identidad": validado
-                    })
+                    consumo_svc.actualizar(st.session_state.id_edicion, datos)
                     st.success("Consumo actualizado")
                 else:
-                    c = Consumo(
-                        ObjectId(est_id_key), ObjectId(sede_id_key),
-                        datetime.combine(fecha, datetime.min.time()),
-                        validado, hora_ingreso=hora
-                    )
-                    consumo_svc.insertar(c)
+                    consumo_svc.insertar(Consumo(**datos))
                     st.success("Consumo guardado")
                 limpiar_edit()
                 st.session_state.show_form = False
@@ -866,7 +888,7 @@ def seccion_consumos():
         )
 
     if st.session_state.show_form:
-        estudiantes_lista = estudiante_svc.obtener_todos()
+        estudiantes_lista = estudiante_svc.obtener_pagina(1, 500)
         sedes_lista       = sede_svc.obtener_todos()
         form_consumo(estudiantes_lista, sedes_lista)
     else:
