@@ -14,7 +14,7 @@ class SedeService:
     def obtener_todos(self):
         return [Sede.from_dict(doc) for doc in self.coleccion.find()]
 
-    def obtener_pagina(self, pagina: int = 1, por_pagina: int = 30):
+    def obtener_pagina(self, pagina: int = 1, por_pagina: int = 20):
         skip = (pagina - 1) * por_pagina
         docs = self.coleccion.find().skip(skip).limit(por_pagina)
         return [Sede.from_dict(doc) for doc in docs]

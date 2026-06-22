@@ -8,6 +8,7 @@ from services import (
     MenuService, EvaluacionService
 )
 from estilos import aplicar_estilos, mostrar_header, render_stat_card
+from seccion_terminal import seccion_terminal
 
 st.set_page_config(page_title="Subsidio de Alimentación", layout="wide")
 
@@ -107,7 +108,7 @@ if "accion" in qp:
     st.rerun()
 
 # ── Sidebar ──
-_opciones_nav = ["Proveedores", "Sedes", "Estudiantes", "Consumos", "Menús", "Evaluaciones"]
+_opciones_nav = ["Proveedores", "Sedes", "Estudiantes", "Consumos", "Menús", "Evaluaciones", "Terminal"]
 _idx_default = 0
 if "_seccion_pendiente" in st.session_state:
     pendiente = st.session_state.pop("_seccion_pendiente")
@@ -179,7 +180,7 @@ def cancelar_form():
 
 # ────────── PAGINACIÓN ──────────
 def render_paginacion(total, pagina_actual, key):
-    total_paginas = max(1, -(-total // REGISTROS_POR_PAGINA))  # ceil division
+    total_paginas = max(1, -(-total // REGISTROS_POR_PAGINA))
     if total_paginas <= 1:
         if total > 0:
             st.markdown(
@@ -218,13 +219,10 @@ def render_tabla(items, cols_def, id_field, servicio, lookup=None, seccion_key="
 
     def fmt(item, attr):
         val = getattr(item, attr, "")
-        # Si es dict y hay display_map, extraer subcampo
         if isinstance(val, dict) and attr in display_map:
             val = val.get(display_map[attr], "")
-        # Si hay lookup, mapear el valor (si es ObjectId o string)
         if lookup and attr in lookup:
             val = lookup[attr].get(str(val), str(val))
-        # Formatear tipos
         if isinstance(val, datetime):
             val = val.strftime("%Y-%m-%d")
         elif isinstance(val, bool):
@@ -235,13 +233,6 @@ def render_tabla(items, cols_def, id_field, servicio, lookup=None, seccion_key="
             val = ""
         else:
             val = str(val)
-        # Si es booleano para badge
-        if isinstance(val, bool):
-            bc = "badge-active" if val else "badge-inactive"
-            return f'<span class="badge {bc}">{val}</span>'
-        # Si el valor original era bool y lo convertimos, no lo tratamos como badge
-        # pero en este punto val ya es string, así que no se puede saber.
-        # Mejor manejamos el badge para "Sí"/"No" en el lookup o con un campo especial.
         return val
 
     headers = "".join(f"<th>{c[0]}</th>" for c in cols_def) + "<th>Editar</th><th>Eliminar</th>"
@@ -312,13 +303,8 @@ def form_proveedor():
             cancelar_form()
 
 
-def form_sede(proveedores_lista):
+def form_sede():
     tit = "Editar sede" if st.session_state.modo_form == "editar" else "Nueva sede"
-    prov_opts = {str(p._id): p.nombre_empresa for p in proveedores_lista}
-    edit_prov_str = str(st.session_state.get("edit_proveedor_id", ""))
-    prov_keys = list(prov_opts.keys())
-    default_idx = prov_keys.index(edit_prov_str) if edit_prov_str in prov_keys else 0
-
     with st.form("form_sede"):
         st.markdown(
             f'<h3 style="color:#0B2545;font-family:\'Source Serif 4\',serif;'
@@ -327,41 +313,52 @@ def form_sede(proveedores_lista):
         )
         c1, c2 = st.columns(2)
         with c1:
-            nombre_sede = st.text_input("Nombre sede", value=st.session_state.get("edit_nombre_sede", ""))
-            ubicacion = st.text_input("Ubicación", value=st.session_state.get("edit_ubicacion", ""))
+            nombre_sede = st.text_input("Nombre sede",
+                value=st.session_state.get("edit_nombre_sede", ""))
+            ubicacion = st.text_input("Ubicación",
+                value=st.session_state.get("edit_ubicacion", ""))
             capacidad = st.number_input("Capacidad máxima", min_value=1, step=1,
-                                        value=st.session_state.get("edit_capacidad_maxima", 100))
-            cupos = st.number_input("Cupos disponibles", min_value=0, step=1,
-                                    value=st.session_state.get("edit_cupos_disponibles", 0))
+                value=int(st.session_state.get("edit_capacidad_maxima", 100)))
         with c2:
-            horario = st.text_input("Horario atención", value=st.session_state.get("edit_horario_atencion", ""))
-            activo_sede = st.checkbox("Activa", value=st.session_state.get("edit_estado_activo", True))
-            prov_id = st.selectbox(
-                "Proveedor", options=prov_keys,
-                format_func=lambda x: prov_opts[x],
-                index=default_idx
-            ) if prov_opts else None
+            horario_actual = st.session_state.get("edit_horario_atencion", {})
+            if isinstance(horario_actual, dict):
+                apertura_default = horario_actual.get("apertura", "11:00")
+                cierre_default   = horario_actual.get("cierre", "15:00")
+            else:
+                apertura_default = "11:00"
+                cierre_default   = "15:00"
+            apertura = st.text_input("Hora apertura", value=apertura_default)
+            cierre   = st.text_input("Hora cierre",   value=cierre_default)
+            activo_sede = st.checkbox("Activa",
+                value=st.session_state.get("edit_estado_activo", True))
+
         cols = st.columns(2)
         if cols[0].form_submit_button(
             "Guardar" if st.session_state.modo_form == "crear" else "Actualizar", type="primary"
         ):
-            if prov_id:
-                if st.session_state.modo_form == "editar":
-                    sede_svc.actualizar(st.session_state.id_edicion, {
-                        "nombre_sede": nombre_sede, "ubicacion": ubicacion,
-                        "capacidad_maxima": int(capacidad), "cupos_disponibles": int(cupos),
-                        "horario_atencion": horario, "estado_activo": activo_sede,
-                        "proveedor_id": ObjectId(prov_id)
-                    })
-                    st.success("Sede actualizada")
-                else:
-                    s = Sede(nombre_sede, ubicacion, int(capacidad), activo_sede,
-                             ObjectId(prov_id), cupos_disponibles=int(cupos), horario_atencion=horario)
-                    sede_svc.insertar(s)
-                    st.success("Sede guardada")
-                limpiar_edit()
-                st.session_state.show_form = False
-                st.rerun()
+            datos = {
+                "nombre_sede":       nombre_sede,
+                "ubicacion":         ubicacion,
+                "capacidad_maxima":  int(capacidad),
+                "horario_atencion":  {"apertura": apertura, "cierre": cierre},
+                "estado_activo":     activo_sede,
+            }
+            if st.session_state.modo_form == "editar":
+                sede_svc.actualizar(st.session_state.id_edicion, datos)
+                st.success("Sede actualizada")
+            else:
+                s = Sede(
+                    nombre_sede=nombre_sede,
+                    ubicacion=ubicacion,
+                    capacidad_maxima=int(capacidad),
+                    estado_activo=activo_sede,
+                    horario_atencion={"apertura": apertura, "cierre": cierre},
+                )
+                sede_svc.insertar(s)
+                st.success("Sede guardada")
+            limpiar_edit()
+            st.session_state.show_form = False
+            st.rerun()
         if cols[1].form_submit_button("Cancelar"):
             cancelar_form()
 
@@ -428,7 +425,7 @@ def form_estudiante():
 
 def form_consumo(estudiantes_lista, sedes_lista):
     tit = "Editar consumo" if st.session_state.modo_form == "editar" else "Nuevo consumo"
-    opts_est = {str(e._id): f"{e.nombre_completo} ({e.codigo_estudiante})" for e in estudiantes_lista}
+    opts_est  = {str(e._id): f"{e.nombre_completo} ({e.codigo_estudiante})" for e in estudiantes_lista}
     opts_sede = {str(s._id): s.nombre_sede for s in sedes_lista}
 
     with st.form("form_consumo"):
@@ -479,13 +476,16 @@ def form_consumo(estudiantes_lista, sedes_lista):
             cancelar_form()
 
 
-# ── Nuevos formularios ──
 def form_menu():
     tit = "Editar menú" if st.session_state.modo_form == "editar" else "Nuevo menú"
     sedes_lista = sede_svc.obtener_todos()
-    opts_sede = {str(s._id): s.nombre_sede for s in sedes_lista}
-    edit_sede = st.session_state.get("edit_sede_id", "")
-    default_sede_idx = list(opts_sede.keys()).index(edit_sede) if edit_sede in opts_sede else 0
+    opts_sede   = {str(s._id): s.nombre_sede for s in sedes_lista}
+
+    edit_sede_id = st.session_state.get("edit_sede_id", "")
+    if isinstance(edit_sede_id, dict):
+        edit_sede_id = ""
+    prov_keys = list(opts_sede.keys())
+    default_sede_idx = prov_keys.index(edit_sede_id) if edit_sede_id in prov_keys else 0
 
     with st.form("form_menu"):
         st.markdown(
@@ -496,50 +496,64 @@ def form_menu():
         c1, c2 = st.columns(2)
         with c1:
             sede_key = st.selectbox(
-                "Sede", options=list(opts_sede.keys()),
+                "Sede", options=prov_keys,
                 format_func=lambda x: opts_sede[x],
                 index=default_sede_idx
             ) if opts_sede else None
-            fecha = st.date_input("Fecha", value=st.session_state.get("edit_fecha", datetime.now().date()))
-            tipo = st.selectbox(
-                "Tipo comida",
-                ["carnivoro", "vegetariano"],
+
+            fecha_default = st.session_state.get("edit_fecha")
+            if hasattr(fecha_default, "date"):
+                fecha_default = fecha_default.date()
+            elif fecha_default is None:
+                from datetime import date as _date
+                fecha_default = _date.today()
+
+            fecha = st.date_input("Fecha", value=fecha_default)
+            tipo  = st.selectbox(
+                "Tipo comida", ["carnivoro", "vegetariano"],
                 index=0 if st.session_state.get("edit_tipo_comida", "carnivoro") == "carnivoro" else 1
             )
         with c2:
-            plato = st.text_area("Plato (sopa / seco)", value=st.session_state.get("edit_plato", ""))
-            info_nutri = st.text_area("Info nutricional (JSON)", value=st.session_state.get("edit_info_nutricional", ""))
-            ingredientes = st.text_input("Ingredientes (separados por coma)", value=st.session_state.get("edit_ingredientes", ""))
-            alergias = st.text_input("Alergias (separadas por coma)", value=st.session_state.get("edit_advertencia_alergias", ""))
+            plato = st.text_area("Plato (sopa / seco)",
+                value=st.session_state.get("edit_plato", ""))
+            ingredientes_raw = st.session_state.get("edit_ingredientes", [])
+            ingredientes_str = st.text_input(
+                "Ingredientes (separados por coma)",
+                value=", ".join(ingredientes_raw) if isinstance(ingredientes_raw, list) else ingredientes_raw
+            )
+            alergias_raw = st.session_state.get("edit_advertencia_alergias", [])
+            alergias_str = st.text_input(
+                "Alergias (separadas por coma)",
+                value=", ".join(alergias_raw) if isinstance(alergias_raw, list) else alergias_raw
+            )
 
         cols = st.columns(2)
         if cols[0].form_submit_button(
             "Guardar" if st.session_state.modo_form == "crear" else "Actualizar", type="primary"
         ):
-            if sede_key:
-                data = {
-                    "sede_id": {"nombre_sede": opts_sede[sede_key], "ubicacion": ""},
-                    "fecha": datetime.combine(fecha, datetime.min.time()),
-                    "tipo_comida": tipo,
-                    "plato": plato,
+            if not sede_key:
+                st.error("Selecciona una sede.")
+            elif not plato.strip():
+                st.error("El campo Plato es obligatorio.")
+            else:
+                sede_doc   = sede_svc.obtener_por_id(sede_key)
+                embed_sede = {
+                    "nombre_sede": sede_doc.nombre_sede,
+                    "ubicacion":   sede_doc.ubicacion,
                 }
-                if info_nutri:
-                    data["info_nutricional"] = info_nutri
-                if ingredientes:
-                    data["ingredientes"] = [i.strip() for i in ingredientes.split(",") if i.strip()]
-                if alergias:
-                    data["advertencia_alergias"] = [a.strip() for a in alergias.split(",") if a.strip()]
-
-                sede_doc = sede_svc.obtener_por_id(sede_key)
-                if sede_doc:
-                    data["sede_id"]["ubicacion"] = sede_doc.ubicacion
-
+                datos = {
+                    "sede_id":              embed_sede,
+                    "fecha":                datetime.combine(fecha, datetime.min.time()),
+                    "tipo_comida":          tipo,
+                    "plato":                plato.strip(),
+                    "ingredientes":         [i.strip() for i in ingredientes_str.split(",") if i.strip()],
+                    "advertencia_alergias": [a.strip() for a in alergias_str.split(",") if a.strip()],
+                }
                 if st.session_state.modo_form == "editar":
-                    menu_svc.actualizar(st.session_state.id_edicion, data)
+                    menu_svc.actualizar(st.session_state.id_edicion, datos)
                     st.success("Menú actualizado")
                 else:
-                    menu = Menu(**data)
-                    menu_svc.insertar(menu)
+                    menu_svc.insertar(Menu(**datos))
                     st.success("Menú guardado")
                 limpiar_edit()
                 st.session_state.show_form = False
@@ -551,13 +565,24 @@ def form_menu():
 def form_evaluacion():
     tit = "Editar evaluación" if st.session_state.modo_form == "editar" else "Nueva evaluación"
 
-    estudiantes_lista = estudiante_svc.obtener_todos()
-    sedes_lista = sede_svc.obtener_todos()
-    menus_lista = menu_svc.obtener_todos()
+    sedes_lista       = sede_svc.obtener_todos()
+    estudiantes_lista = estudiante_svc.obtener_pagina(1, 200)
+    menus_lista       = menu_svc.obtener_pagina(1, 200)
 
-    opts_est = {str(e._id): f"{e.nombre_completo} ({e.codigo_estudiante})" for e in estudiantes_lista}
     opts_sede = {str(s._id): s.nombre_sede for s in sedes_lista}
-    opts_menu = {str(m._id): f"{m.plato[:40]} - {m.fecha.strftime('%Y-%m-%d')}" for m in menus_lista}
+    opts_est  = {
+        str(e._id): f"{e.nombre_completo} ({e.codigo_estudiante})"
+        for e in estudiantes_lista
+    }
+    opts_menu = {
+        str(m._id): f"{m.plato[:45]} [{m.tipo_comida}] {m.fecha.strftime('%Y-%m-%d') if m.fecha else ''}"
+        for m in menus_lista
+    }
+
+    def _idx(opts, edit_key):
+        val  = str(st.session_state.get(edit_key, ""))
+        keys = list(opts.keys())
+        return keys.index(val) if val in keys else 0
 
     with st.form("form_evaluacion"):
         st.markdown(
@@ -570,60 +595,86 @@ def form_evaluacion():
             est_key = st.selectbox(
                 "Estudiante", options=list(opts_est.keys()),
                 format_func=lambda x: opts_est[x],
-                index=0 if not st.session_state.get("edit_estudiante_id") else list(opts_est.keys()).index(st.session_state["edit_estudiante_id"])
+                index=_idx(opts_est, "edit_estudiante_id")
             ) if opts_est else None
+
             sede_key = st.selectbox(
                 "Sede", options=list(opts_sede.keys()),
                 format_func=lambda x: opts_sede[x],
-                index=0 if not st.session_state.get("edit_sede_id") else list(opts_sede.keys()).index(st.session_state["edit_sede_id"])
+                index=_idx(opts_sede, "edit_sede_id")
             ) if opts_sede else None
+
             menu_key = st.selectbox(
-                "Menú", options=list(opts_menu.keys()),
-                format_func=lambda x: opts_menu[x],
-                index=0 if not st.session_state.get("edit_menu_id") else list(opts_menu.keys()).index(st.session_state["edit_menu_id"])
+                "Menú (opcional)", options=[""] + list(opts_menu.keys()),
+                format_func=lambda x: "— Sin menú —" if x == "" else opts_menu[x],
+                index=0
             ) if opts_menu else None
+
         with c2:
-            fecha_eval = st.date_input("Fecha evaluación", value=st.session_state.get("edit_fecha_evaluacion", datetime.now().date()))
-            calificacion = st.selectbox("Calificación", list(range(1, 6)), index=st.session_state.get("edit_calificacion", 3)-1)
-            comentario = st.text_area("Comentario", value=st.session_state.get("edit_comentario", ""))
-            sugerencias = st.text_area("Sugerencias", value=st.session_state.get("edit_sugerencias", ""))
+            fecha_default = st.session_state.get("edit_fecha_evaluacion")
+            if hasattr(fecha_default, "date"):
+                fecha_default = fecha_default.date()
+            elif fecha_default is None:
+                from datetime import date as _date
+                fecha_default = _date.today()
+
+            fecha_eval    = st.date_input("Fecha evaluación", value=fecha_default)
+            calif_default = int(st.session_state.get("edit_calificacion", 3))
+            calificacion  = st.selectbox("Calificación (1–5)", list(range(1, 6)),
+                                         index=calif_default - 1)
+            comentario  = st.text_area("Comentario",
+                value=st.session_state.get("edit_comentario", "") or "")
+            sugerencias = st.text_area("Sugerencias",
+                value=st.session_state.get("edit_sugerencias", "") or "")
 
         cols = st.columns(2)
         if cols[0].form_submit_button(
             "Guardar" if st.session_state.modo_form == "crear" else "Actualizar", type="primary"
         ):
-            if est_key and sede_key and menu_key:
-                est_doc = estudiantes_lista[[e for e in estudiantes_lista if str(e._id)==est_key][0]]
-                sede_doc = sedes_lista[[s for s in sedes_lista if str(s._id)==sede_key][0]]
-                menu_doc = menus_lista[[m for m in menus_lista if str(m._id)==menu_key][0]]
+            if not est_key or not sede_key:
+                st.error("Estudiante y Sede son obligatorios.")
+            else:
+                est_doc  = next((e for e in estudiantes_lista if str(e._id) == est_key), None)
+                sede_doc = next((s for s in sedes_lista      if str(s._id) == sede_key), None)
+                menu_doc = next((m for m in menus_lista      if str(m._id) == menu_key), None) if menu_key else None
 
-                data = {
-                    "estudiante_id": {
-                        "nombre_completo": est_doc.nombre_completo,
-                        "codigo_estudiante": est_doc.codigo_estudiante,
-                        "semestre": est_doc.semestre,
-                        "fecha_inicio_subsidio": est_doc.fecha_inicio_subsidio,
-                        "fecha_fin_subsidio": est_doc.fecha_fin_subsidio,
-                    },
-                    "sede_id": {
-                        "nombre_sede": sede_doc.nombre_sede,
-                        "ubicacion": sede_doc.ubicacion,
-                    },
-                    "menu_id": {
-                        "plato": menu_doc.plato,
-                        "tipo_comida": menu_doc.tipo_comida,
-                    },
-                    "fecha_evaluacion": datetime.combine(fecha_eval, datetime.min.time()),
-                    "calificacion": calificacion,
-                    "comentario": comentario if comentario else None,
-                    "sugerencias": sugerencias if sugerencias else None,
+                embed_est = {
+                    "nombre_completo":       est_doc.nombre_completo,
+                    "codigo_estudiante":     est_doc.codigo_estudiante,
+                    "semestre":              est_doc.semestre or 1,
+                    "fecha_inicio_subsidio": est_doc.fecha_inicio_subsidio,
+                    "fecha_fin_subsidio":    est_doc.fecha_fin_subsidio,
                 }
+                embed_sede = {
+                    "nombre_sede": sede_doc.nombre_sede,
+                    "ubicacion":   sede_doc.ubicacion,
+                }
+                embed_menu = None
+                if menu_doc:
+                    embed_menu = {
+                        "plato":       menu_doc.plato,
+                        "tipo_comida": menu_doc.tipo_comida,
+                    }
+
+                datos = {
+                    "estudiante_id":    embed_est,
+                    "sede_id":          embed_sede,
+                    "fecha_evaluacion": datetime.combine(fecha_eval, datetime.min.time()),
+                    "calificacion":     int(calificacion),
+                }
+                # Campos opcionales: solo incluir si tienen valor
+                if embed_menu:
+                    datos["menu_id"] = embed_menu
+                if comentario.strip():
+                    datos["comentario"] = comentario.strip()
+                if sugerencias.strip():
+                    datos["sugerencias"] = sugerencias.strip()
+
                 if st.session_state.modo_form == "editar":
-                    evaluacion_svc.actualizar(st.session_state.id_edicion, data)
+                    evaluacion_svc.actualizar(st.session_state.id_edicion, datos)
                     st.success("Evaluación actualizada")
                 else:
-                    evaluacion = Evaluacion(**data)
-                    evaluacion_svc.insertar(evaluacion)
+                    evaluacion_svc.insertar(Evaluacion(**datos))
                     st.success("Evaluación guardada")
                 limpiar_edit()
                 st.session_state.show_form = False
@@ -634,9 +685,9 @@ def form_evaluacion():
 
 # ────────── SECCIONES ──────────
 def seccion_proveedores():
-    total = proveedor_svc.contar()
+    total  = proveedor_svc.contar()
     pagina = st.session_state.pag_proveedores
-    todos = proveedor_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
+    todos  = proveedor_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
 
     st.markdown('<h2 style="margin-bottom:4px;">Proveedores</h2>', unsafe_allow_html=True)
     m1, m2, m3 = st.columns(3)
@@ -678,11 +729,9 @@ def seccion_proveedores():
 
 
 def seccion_sedes():
-    total = sede_svc.contar()
+    total  = sede_svc.contar()
     pagina = st.session_state.pag_sedes
-    todos = sede_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
-
-    proveedores_lista = proveedor_svc.obtener_todos()
+    todos  = sede_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
 
     st.markdown('<h2 style="margin-bottom:4px;">Sedes</h2>', unsafe_allow_html=True)
     m1, m2, m3 = st.columns(3)
@@ -691,13 +740,26 @@ def seccion_sedes():
     with m2:
         pipeline = [{"$group": {"_id": None, "total": {"$sum": "$capacidad_maxima"}}}]
         res = list(sede_svc.coleccion.aggregate(pipeline))
-        cap_total = res[0]["total"] if res else 0
-        render_stat_card("users", cap_total, "Capacidad total", "#C9A227")
+        render_stat_card("users", res[0]["total"] if res else 0, "Capacidad total", "#C9A227")
+    with m3:
+        render_stat_card(
+            "check-circle",
+            sede_svc.coleccion.count_documents({"estado_activo": True}),
+            "Activas", "#5C6470"
+        )
 
-    prov_lookup = {str(p._id): p.nombre_empresa for p in proveedores_lista}
+    if st.session_state.show_form:
+        form_sede()
+    else:
+        if st.button("+ Agregar sede", key="btn_agregar_sede", type="primary"):
+            limpiar_edit()
+            st.session_state.modo_form = "crear"
+            st.session_state.show_form = True
+            st.rerun()
+
     render_tabla(
         todos,
-        [("Sede", 2, "nombre_sede"), ("Ubicación", 1, "ubicacion"),
+        [("Sede", 2, "nombre_sede"), ("Ubicación", 2, "ubicacion"),
          ("Capacidad", 1, "capacidad_maxima"), ("Activa", 1, "estado_activo")],
         "_id", sede_svc, seccion_key="sedes"
     )
@@ -728,17 +790,15 @@ def seccion_estudiantes():
             "Inactivos", "#5C6470"
         )
 
-    # ── Filtros ──
     st.markdown('<div class="filter-bar">', unsafe_allow_html=True)
     col_f1, col_f2 = st.columns([2, 1])
     with col_f1:
         codigo_filtro = st.text_input("Buscar por código", placeholder="Ej: 2024101001", label_visibility="collapsed")
     with col_f2:
-        semestre_opts = ["Todos"] + [str(i) for i in range(1, 13)]
+        semestre_opts   = ["Todos"] + [str(i) for i in range(1, 13)]
         semestre_filtro = st.selectbox("Semestre", semestre_opts, index=0, label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Construir filtro ──
     filtro = {}
     if codigo_filtro:
         filtro["codigo_estudiante"] = {"$regex": codigo_filtro, "$options": "i"}
@@ -746,14 +806,14 @@ def seccion_estudiantes():
         filtro["semestre"] = int(semestre_filtro)
 
     if filtro:
-        total = estudiante_svc.contar_con_filtro(filtro)
+        total  = estudiante_svc.contar_con_filtro(filtro)
         pagina = 1
         st.session_state.pag_estudiantes = 1
-        todos = estudiante_svc.buscar_con_filtro(filtro, pagina, REGISTROS_POR_PAGINA)
+        todos  = estudiante_svc.buscar_con_filtro(filtro, pagina, REGISTROS_POR_PAGINA)
     else:
-        total = estudiante_svc.contar()
+        total  = estudiante_svc.contar()
         pagina = st.session_state.pag_estudiantes
-        todos = estudiante_svc.buscar_con_filtro({}, pagina, REGISTROS_POR_PAGINA)
+        todos  = estudiante_svc.buscar_con_filtro({}, pagina, REGISTROS_POR_PAGINA)
 
     if st.session_state.show_form:
         form_estudiante()
@@ -779,11 +839,10 @@ def seccion_estudiantes():
 
 
 def seccion_consumos():
-    total = consumo_svc.contar()
+    total  = consumo_svc.contar()
     pagina = st.session_state.pag_consumos
-    todos = consumo_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
-
-    hoy = datetime.now().date()
+    todos  = consumo_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
+    hoy    = datetime.now().date()
 
     st.markdown('<h2 style="margin-bottom:4px;">Consumos</h2>', unsafe_allow_html=True)
     m1, m2, m3 = st.columns(3)
@@ -797,7 +856,7 @@ def seccion_consumos():
         )
     with m3:
         inicio_hoy = datetime.combine(hoy, datetime.min.time())
-        fin_hoy = datetime.combine(hoy, datetime.max.time())
+        fin_hoy    = datetime.combine(hoy, datetime.max.time())
         render_stat_card(
             "calendar-day",
             consumo_svc.coleccion.count_documents({
@@ -808,7 +867,7 @@ def seccion_consumos():
 
     if st.session_state.show_form:
         estudiantes_lista = estudiante_svc.obtener_todos()
-        sedes_lista = sede_svc.obtener_todos()
+        sedes_lista       = sede_svc.obtener_todos()
         form_consumo(estudiantes_lista, sedes_lista)
     else:
         if st.button("+ Agregar consumo", key="btn_agregar_consumo", type="primary"):
@@ -832,22 +891,27 @@ def seccion_consumos():
         st.rerun()
 
 
-# ── Nuevas secciones ──
 def seccion_menus():
-    total = menu_svc.contar()
+    total  = menu_svc.contar()
     pagina = st.session_state.pag_menus
-    todos = menu_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
+    todos  = menu_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
 
     st.markdown('<h2 style="margin-bottom:4px;">Menús</h2>', unsafe_allow_html=True)
     m1, m2, m3 = st.columns(3)
     with m1:
         render_stat_card("utensils", total, "Total menús", "#1B4079")
     with m2:
-        carn = menu_svc.coleccion.count_documents({"tipo_comida": "carnivoro"})
-        render_stat_card("drumstick-bite", carn, "Carnívoros", "#C9A227")
+        render_stat_card(
+            "drumstick-bite",
+            menu_svc.coleccion.count_documents({"tipo_comida": "carnivoro"}),
+            "Carnívoros", "#C9A227"
+        )
     with m3:
-        veg = menu_svc.coleccion.count_documents({"tipo_comida": "vegetariano"})
-        render_stat_card("leaf", veg, "Vegetarianos", "#5C6470")
+        render_stat_card(
+            "leaf",
+            menu_svc.coleccion.count_documents({"tipo_comida": "vegetariano"}),
+            "Vegetarianos", "#5C6470"
+        )
 
     if st.session_state.show_form:
         form_menu()
@@ -858,14 +922,11 @@ def seccion_menus():
             st.session_state.show_form = True
             st.rerun()
 
-    sedes_lista = sede_svc.obtener_todos()
-    sede_lookup = {str(s._id): s.nombre_sede for s in sedes_lista}
     render_tabla(
         todos,
-        [("Fecha", 1, "fecha"), ("Sede", 2, "sede_id"), ("Tipo", 1, "tipo_comida"),
-         ("Plato", 3, "plato")],
+        [("Fecha", 1, "fecha"), ("Sede", 2, "sede_id"),
+         ("Tipo", 1, "tipo_comida"), ("Plato", 3, "plato")],
         "_id", menu_svc,
-        lookup={"sede_id": sede_lookup},
         display_map={"sede_id": "nombre_sede"},
         seccion_key="menus"
     )
@@ -877,23 +938,27 @@ def seccion_menus():
 
 
 def seccion_evaluaciones():
-    total = evaluacion_svc.contar()
+    total  = evaluacion_svc.contar()
     pagina = st.session_state.pag_evaluaciones
-    todos = evaluacion_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
+    todos  = evaluacion_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
 
     st.markdown('<h2 style="margin-bottom:4px;">Evaluaciones</h2>', unsafe_allow_html=True)
-
     m1, m2, m3 = st.columns(3)
     with m1:
         render_stat_card("star", total, "Total evaluaciones", "#1B4079")
     with m2:
         pipeline = [{"$group": {"_id": None, "prom": {"$avg": "$calificacion"}}}]
-        res = list(evaluacion_svc.coleccion.aggregate(pipeline))
+        res  = list(evaluacion_svc.coleccion.aggregate(pipeline))
         prom = res[0]["prom"] if res else 0
         render_stat_card("chart-line", f"{prom:.1f}", "Promedio", "#C9A227")
     with m3:
-        with_comment = evaluacion_svc.coleccion.count_documents({"comentario": {"$exists": True, "$ne": ""}})
-        render_stat_card("comment", with_comment, "Con comentario", "#5C6470")
+        render_stat_card(
+            "comment",
+            evaluacion_svc.coleccion.count_documents(
+                {"comentario": {"$exists": True, "$ne": None}}
+            ),
+            "Con comentario", "#5C6470"
+        )
 
     if st.session_state.show_form:
         form_evaluacion()
@@ -920,7 +985,7 @@ def seccion_evaluaciones():
         st.rerun()
 
 
-# ────────── ELIMINACIÓN (modal real) ──────────
+# ────────── ELIMINACIÓN ──────────
 @st.dialog("Confirmar eliminación")
 def confirmar_eliminacion_dialog(cid):
     st.warning("¿Estás seguro de eliminar este registro? Esta acción no se puede deshacer.")
@@ -950,12 +1015,13 @@ elif proveedor_svc is None:
     st.info("Verifica la conexión MongoDB en el archivo .env y reinicia la aplicación.")
 else:
     secciones = {
-        "Proveedores": seccion_proveedores,
-        "Sedes": seccion_sedes,
-        "Estudiantes": seccion_estudiantes,
-        "Consumos": seccion_consumos,
-        "Menús": seccion_menus,
+        "Proveedores":  seccion_proveedores,
+        "Sedes":        seccion_sedes,
+        "Estudiantes":  seccion_estudiantes,
+        "Consumos":     seccion_consumos,
+        "Menús":        seccion_menus,
         "Evaluaciones": seccion_evaluaciones,
+        "Terminal":     seccion_terminal,
     }
     if st.session_state.seccion in secciones:
         secciones[st.session_state.seccion]()

@@ -1,6 +1,5 @@
-# models.py
-
 from bson import ObjectId
+
 
 class Evaluacion:
     coleccion = "evaluaciones"
@@ -14,11 +13,11 @@ class Evaluacion:
                     "bsonType": "object",
                     "required": ["nombre_completo", "codigo_estudiante"],
                     "properties": {
-                        "nombre_completo":        {"bsonType": "string"},
-                        "codigo_estudiante":      {"bsonType": "string"},
-                        "semestre":               {"bsonType": "int"},
-                        "fecha_inicio_subsidio":  {"bsonType": "date"},
-                        "fecha_fin_subsidio":     {"bsonType": "date"}
+                        "nombre_completo":       {"bsonType": "string"},
+                        "codigo_estudiante":     {"bsonType": "string"},
+                        "semestre":              {"bsonType": "int"},
+                        "fecha_inicio_subsidio": {"bsonType": "date"},
+                        "fecha_fin_subsidio":    {"bsonType": "date"}
                     }
                 },
                 "sede_id": {
@@ -37,13 +36,9 @@ class Evaluacion:
                     }
                 },
                 "fecha_evaluacion": {"bsonType": "date"},
-                "calificacion": {
-                    "bsonType": "int",
-                    "minimum": 1,
-                    "maximum": 5
-                },
-                "comentario":  {"bsonType": "string"},
-                "sugerencias": {"bsonType": "string"}
+                "calificacion": {"bsonType": "int", "minimum": 1, "maximum": 5},
+                "comentario":   {"bsonType": "string"},
+                "sugerencias":  {"bsonType": "string"}
             }
         }
     }
@@ -51,9 +46,9 @@ class Evaluacion:
     def __init__(self, estudiante_id, sede_id, fecha_evaluacion, calificacion,
                  comentario=None, sugerencias=None, menu_id=None, _id=None):
         self._id              = _id or ObjectId()
-        self.estudiante_id    = estudiante_id   # dict embebido
-        self.sede_id          = sede_id         # dict embebido
-        self.menu_id          = menu_id         # dict embebido: {plato, tipo_comida}
+        self.estudiante_id    = estudiante_id
+        self.sede_id          = sede_id
+        self.menu_id          = menu_id
         self.fecha_evaluacion = fecha_evaluacion
         self.calificacion     = calificacion
         self.comentario       = comentario
@@ -65,5 +60,14 @@ class Evaluacion:
     @classmethod
     def from_dict(cls, data):
         data = dict(data)
-        data.pop("_id", None)
-        return cls(**data)
+        _id = data.pop("_id", None)
+        obj = cls.__new__(cls)
+        obj._id              = _id or ObjectId()
+        obj.estudiante_id    = data.get("estudiante_id", {})
+        obj.sede_id          = data.get("sede_id", {})
+        obj.menu_id          = data.get("menu_id")
+        obj.fecha_evaluacion = data.get("fecha_evaluacion")
+        obj.calificacion     = data.get("calificacion", 1)
+        obj.comentario       = data.get("comentario")
+        obj.sugerencias      = data.get("sugerencias")
+        return obj

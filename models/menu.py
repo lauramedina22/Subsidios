@@ -17,12 +17,9 @@ class Menu:
                         "ubicacion":   {"bsonType": "string"}
                     }
                 },
-                "fecha":      {"bsonType": "date"},
-                "tipo_comida": {
-                    "bsonType": "string",
-                    "enum": ["carnivoro", "vegetariano"]
-                },
-                "plato":      {"bsonType": "string"},
+                "fecha":       {"bsonType": "date"},
+                "tipo_comida": {"bsonType": "string", "enum": ["carnivoro", "vegetariano"]},
+                "plato":       {"bsonType": "string"},
                 "info_nutricional": {
                     "bsonType": "object",
                     "properties": {
@@ -32,14 +29,8 @@ class Menu:
                         "grasas":        {"bsonType": "string"}
                     }
                 },
-                "ingredientes":          {
-                    "bsonType": "array",
-                    "items": {"bsonType": "string"}
-                },
-                "advertencia_alergias": {
-                    "bsonType": "array",
-                    "items": {"bsonType": "string"}
-                }
+                "ingredientes":         {"bsonType": "array", "items": {"bsonType": "string"}},
+                "advertencia_alergias": {"bsonType": "array", "items": {"bsonType": "string"}}
             }
         }
     }
@@ -48,7 +39,7 @@ class Menu:
                  info_nutricional=None, ingredientes=None,
                  advertencia_alergias=None, _id=None):
         self._id                  = _id or ObjectId()
-        self.sede_id              = sede_id     # dict embebido: {nombre_sede, ubicacion}
+        self.sede_id              = sede_id
         self.fecha                = fecha
         self.tipo_comida          = tipo_comida
         self.plato                = plato
@@ -62,5 +53,14 @@ class Menu:
     @classmethod
     def from_dict(cls, data):
         data = dict(data)
-        data.pop("_id", None)
-        return cls(**data)
+        _id = data.pop("_id", None)
+        obj = cls.__new__(cls)
+        obj._id                  = _id or ObjectId()
+        obj.sede_id              = data.get("sede_id", {})
+        obj.fecha                = data.get("fecha")
+        obj.tipo_comida          = data.get("tipo_comida", "")
+        obj.plato                = data.get("plato", "")
+        obj.info_nutricional     = data.get("info_nutricional", {})
+        obj.ingredientes         = data.get("ingredientes", [])
+        obj.advertencia_alergias = data.get("advertencia_alergias", [])
+        return obj

@@ -14,7 +14,7 @@ class MenuService:
     def obtener_todos(self):
         return [Menu.from_dict(doc) for doc in self.coleccion.find()]
 
-    def obtener_pagina(self, pagina: int = 1, por_pagina: int = 30):
+    def obtener_pagina(self, pagina: int = 1, por_pagina: int = 20):
         skip = (pagina - 1) * por_pagina
         docs = self.coleccion.find().skip(skip).limit(por_pagina)
         return [Menu.from_dict(doc) for doc in docs]
@@ -25,15 +25,6 @@ class MenuService:
     def obtener_por_id(self, id):
         doc = self.coleccion.find_one({"_id": ObjectId(id)})
         return Menu.from_dict(doc) if doc else None
-
-    def obtener_por_sede_y_fecha(self, sede_id, fecha):
-        return list(self.coleccion.find({
-            "sede_id": ObjectId(sede_id),
-            "fecha": fecha
-        }))
-
-    def obtener_por_tipo(self, tipo_comida):
-        return list(self.coleccion.find({"tipo_comida": tipo_comida}))
 
     def actualizar(self, id, datos):
         self.coleccion.update_one({"_id": ObjectId(id)}, {"$set": datos})
