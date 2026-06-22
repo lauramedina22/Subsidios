@@ -193,6 +193,22 @@ def aplicar_estilos():
             color: #FFFFFF !important;
         }
 
+        /* ───────────────────────── FILTER BAR ───────────────────────── */
+        .filter-bar {
+            background: #FFFFFF;
+            border: 1px solid #D0D5DD;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .filter-bar .stTextInput, .filter-bar .stSelectbox {
+            margin-bottom: 0 !important;
+        }
+
         /* ───────────────────────── FORM ───────────────────────── */
         [data-testid="stForm"] {
             background: #FFFFFF;

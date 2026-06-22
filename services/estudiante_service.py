@@ -22,6 +22,28 @@ class EstudianteService:
     def contar(self) -> int:
         return self.coleccion.count_documents({})
 
+    def buscar_con_filtro(self, filtro, pagina=1, por_pagina=20):
+        skip = (pagina - 1) * por_pagina
+        pipeline = [
+            {"$match": filtro},
+            {"$group": {"_id": "$codigo_estudiante", "doc": {"$first": "$$ROOT"}}},
+            {"$replaceWith": "$doc"},
+            {"$sort": {"codigo_estudiante": 1}},
+            {"$skip": skip},
+            {"$limit": por_pagina}
+        ]
+        docs = self.coleccion.aggregate(pipeline, allowDiskUse=True)
+        return [Estudiante.from_dict(doc) for doc in docs]
+
+    def contar_con_filtro(self, filtro):
+        pipeline = [
+            {"$match": filtro},
+            {"$group": {"_id": "$codigo_estudiante"}},
+            {"$count": "total"}
+        ]
+        result = list(self.coleccion.aggregate(pipeline, allowDiskUse=True))
+        return result[0]["total"] if result else 0
+
     def obtener_por_id(self, id):
         doc = self.coleccion.find_one({"_id": ObjectId(id)})
         return Estudiante.from_dict(doc) if doc else None

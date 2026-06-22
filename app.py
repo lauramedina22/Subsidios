@@ -14,7 +14,7 @@ st.set_page_config(page_title="Subsidio de Alimentación", layout="wide")
 aplicar_estilos()
 mostrar_header()
 
-REGISTROS_POR_PAGINA = 30
+REGISTROS_POR_PAGINA = 20
 
 # ── Session state init ──
 _INIT = {
@@ -709,14 +709,12 @@ def seccion_sedes():
 
 
 def seccion_estudiantes():
-    total = estudiante_svc.contar()
-    pagina = st.session_state.pag_estudiantes
-    todos = estudiante_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
-
     st.markdown('<h2 style="margin-bottom:4px;">Estudiantes</h2>', unsafe_allow_html=True)
+
+    total_sin_filtro = estudiante_svc.contar()
     m1, m2, m3 = st.columns(3)
     with m1:
-        render_stat_card("user-graduate", total, "Total estudiantes", "#1B4079")
+        render_stat_card("user-graduate", total_sin_filtro, "Total estudiantes", "#1B4079")
     with m2:
         render_stat_card(
             "check-circle",
@@ -729,6 +727,33 @@ def seccion_estudiantes():
             estudiante_svc.coleccion.count_documents({"subsidio_activo": False}),
             "Inactivos", "#5C6470"
         )
+
+    # ── Filtros ──
+    st.markdown('<div class="filter-bar">', unsafe_allow_html=True)
+    col_f1, col_f2 = st.columns([2, 1])
+    with col_f1:
+        codigo_filtro = st.text_input("Buscar por código", placeholder="Ej: 2024101001", label_visibility="collapsed")
+    with col_f2:
+        semestre_opts = ["Todos"] + [str(i) for i in range(1, 13)]
+        semestre_filtro = st.selectbox("Semestre", semestre_opts, index=0, label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Construir filtro ──
+    filtro = {}
+    if codigo_filtro:
+        filtro["codigo_estudiante"] = {"$regex": codigo_filtro, "$options": "i"}
+    if semestre_filtro != "Todos":
+        filtro["semestre"] = int(semestre_filtro)
+
+    if filtro:
+        total = estudiante_svc.contar_con_filtro(filtro)
+        pagina = 1
+        st.session_state.pag_estudiantes = 1
+        todos = estudiante_svc.buscar_con_filtro(filtro, pagina, REGISTROS_POR_PAGINA)
+    else:
+        total = estudiante_svc.contar()
+        pagina = st.session_state.pag_estudiantes
+        todos = estudiante_svc.buscar_con_filtro({}, pagina, REGISTROS_POR_PAGINA)
 
     if st.session_state.show_form:
         form_estudiante()
@@ -758,8 +783,6 @@ def seccion_consumos():
     pagina = st.session_state.pag_consumos
     todos = consumo_svc.obtener_pagina(pagina, REGISTROS_POR_PAGINA)
 
-    estudiantes_lista = estudiante_svc.obtener_todos()
-    sedes_lista = sede_svc.obtener_todos()
     hoy = datetime.now().date()
 
     st.markdown('<h2 style="margin-bottom:4px;">Consumos</h2>', unsafe_allow_html=True)
@@ -784,6 +807,8 @@ def seccion_consumos():
         )
 
     if st.session_state.show_form:
+        estudiantes_lista = estudiante_svc.obtener_todos()
+        sedes_lista = sede_svc.obtener_todos()
         form_consumo(estudiantes_lista, sedes_lista)
     else:
         if st.button("+ Agregar consumo", key="btn_agregar_consumo", type="primary"):
@@ -792,14 +817,13 @@ def seccion_consumos():
             st.session_state.show_form = True
             st.rerun()
 
-    est_lookup = {str(e._id): e.nombre_completo for e in estudiantes_lista}
-    sede_lookup = {str(s._id): s.nombre_sede for s in sedes_lista}
     render_tabla(
         todos,
         [("Estudiante", 2, "estudiante_id"), ("Sede", 2, "sede_id"),
          ("Fecha", 1, "fecha_consumo"), ("Hora", 1, "hora_ingreso"), ("Validado", 1, "validacion_identidad")],
         "_id", consumo_svc,
-        lookup={"estudiante_id": est_lookup, "sede_id": sede_lookup}, seccion_key="consumos"
+        display_map={"estudiante_id": "nombre_completo", "sede_id": "nombre_sede"},
+        seccion_key="consumos"
     )
 
     nueva_pagina = render_paginacion(total, pagina, "consumos")
@@ -880,18 +904,12 @@ def seccion_evaluaciones():
             st.session_state.show_form = True
             st.rerun()
 
-    estudiantes_lista = estudiante_svc.obtener_todos()
-    sedes_lista = sede_svc.obtener_todos()
-    est_lookup = {str(e._id): e.nombre_completo for e in estudiantes_lista}
-    sede_lookup = {str(s._id): s.nombre_sede for s in sedes_lista}
-
     render_tabla(
         todos,
         [("Estudiante", 2, "estudiante_id"), ("Sede", 1, "sede_id"),
          ("Fecha", 1, "fecha_evaluacion"), ("Calif.", 1, "calificacion"),
          ("Comentario", 2, "comentario")],
         "_id", evaluacion_svc,
-        lookup={"estudiante_id": est_lookup, "sede_id": sede_lookup},
         display_map={"estudiante_id": "nombre_completo", "sede_id": "nombre_sede"},
         seccion_key="evaluaciones"
     )
