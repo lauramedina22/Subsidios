@@ -888,7 +888,7 @@ def seccion_consumos():
         )
 
     if st.session_state.show_form:
-        estudiantes_lista = estudiante_svc.obtener_pagina(1, 500)
+        estudiantes_lista = estudiante_svc.buscar_con_filtro({}, 1, 500)
         sedes_lista       = sede_svc.obtener_todos()
         form_consumo(estudiantes_lista, sedes_lista)
     else:
