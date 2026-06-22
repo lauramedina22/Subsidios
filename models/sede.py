@@ -19,18 +19,27 @@ class Sede:
                         "cierre":   {"bsonType": "string"}
                     }
                 },
+                "proveedor_id": {
+                    "bsonType": "object",
+                    "required": ["nombre_empresa", "telefono"],
+                    "properties": {
+                        "nombre_empresa": {"bsonType": "string"},
+                        "telefono":       {"bsonType": "string"}
+                    }
+                },
                 "estado_activo": {"bsonType": "bool"}
             }
         }
     }
 
     def __init__(self, nombre_sede, ubicacion, capacidad_maxima, estado_activo,
-                 horario_atencion=None, _id=None):
+                 horario_atencion=None, proveedor_id=None, _id=None):
         self._id             = _id or ObjectId()
         self.nombre_sede     = nombre_sede
         self.ubicacion       = ubicacion
         self.capacidad_maxima = capacidad_maxima
         self.horario_atencion = horario_atencion or {"apertura": "11:00", "cierre": "15:00"}
+        self.proveedor_id    = proveedor_id  # dict embebido: {nombre_empresa, telefono}
         self.estado_activo   = estado_activo
 
     def to_dict(self):

@@ -44,6 +44,14 @@ SEDES = [
 
 HORARIO_DEFAULT = {"apertura": "11:00", "cierre": "15:00"}
 
+# Datos embebidos del proveedor (Maaz Alternativas S.A.S), insertado
+# manualmente en la coleccion proveedores. Solo se copian nombre_empresa
+# y telefono; el _id real del proveedor nunca se referencia aqui.
+PROVEEDOR_DEFAULT = {
+    "nombre_empresa": "Maaz Alternativas S.A.S",
+    "telefono": "3102558965"
+}
+
 
 def insertar_sedes():
     db = obtener_bd()
@@ -62,7 +70,8 @@ def insertar_sedes():
             ubicacion        = datos["ubicacion"],
             capacidad_maxima = datos["capacidad_maxima"],
             estado_activo    = datos["estado_activo"],
-            horario_atencion = HORARIO_DEFAULT
+            horario_atencion = HORARIO_DEFAULT,
+            proveedor_id     = PROVEEDOR_DEFAULT
         )
         docs.append(sede.to_dict())
 

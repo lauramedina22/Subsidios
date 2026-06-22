@@ -1,5 +1,4 @@
 import streamlit as st
-from seccion_terminal import seccion_terminal
 from datetime import datetime
 from bson import ObjectId
 from models import Proveedor, Sede, Estudiante, Consumo, Menu, Evaluacion, crear_colecciones
@@ -108,7 +107,7 @@ if "accion" in qp:
     st.rerun()
 
 # ── Sidebar ──
-_opciones_nav = ["Proveedores", "Sedes", "Estudiantes", "Consumos", "Menús", "Evaluaciones", "Terminal"]
+_opciones_nav = ["Proveedores", "Sedes", "Estudiantes", "Consumos", "Menús", "Evaluaciones"]
 _idx_default = 0
 if "_seccion_pendiente" in st.session_state:
     pendiente = st.session_state.pop("_seccion_pendiente")
@@ -315,10 +314,26 @@ def form_proveedor():
 
 def form_sede(proveedores_lista):
     tit = "Editar sede" if st.session_state.modo_form == "editar" else "Nueva sede"
+
+    # Las opciones del selector usan el _id real del proveedor SOLO como
+    # clave interna del widget (para que Streamlit identifique la opción
+    # elegida). Ese _id nunca se guarda en Sede; solo se copian
+    # nombre_empresa y telefono al embebido.
     prov_opts = {str(p._id): p.nombre_empresa for p in proveedores_lista}
-    edit_prov_str = str(st.session_state.get("edit_proveedor_id", ""))
+    prov_by_id = {str(p._id): p for p in proveedores_lista}
     prov_keys = list(prov_opts.keys())
-    default_idx = prov_keys.index(edit_prov_str) if edit_prov_str in prov_keys else 0
+
+    # En modo edición, edit_proveedor_id llega como el DICT embebido
+    # {nombre_empresa, telefono}, no como un _id. Buscamos el proveedor
+    # actual por nombre_empresa para preseleccionarlo en el selectbox.
+    edit_prov_embed = st.session_state.get("edit_proveedor_id", {})
+    edit_nombre_empresa = edit_prov_embed.get("nombre_empresa") if isinstance(edit_prov_embed, dict) else None
+    default_idx = 0
+    if edit_nombre_empresa:
+        for i, k in enumerate(prov_keys):
+            if prov_opts[k] == edit_nombre_empresa:
+                default_idx = i
+                break
 
     with st.form("form_sede"):
         st.markdown(
@@ -337,7 +352,7 @@ def form_sede(proveedores_lista):
         with c2:
             horario = st.text_input("Horario atención", value=st.session_state.get("edit_horario_atencion", ""))
             activo_sede = st.checkbox("Activa", value=st.session_state.get("edit_estado_activo", True))
-            prov_id = st.selectbox(
+            prov_key = st.selectbox(
                 "Proveedor", options=prov_keys,
                 format_func=lambda x: prov_opts[x],
                 index=default_idx
@@ -346,18 +361,25 @@ def form_sede(proveedores_lista):
         if cols[0].form_submit_button(
             "Guardar" if st.session_state.modo_form == "crear" else "Actualizar", type="primary"
         ):
-            if prov_id:
+            if prov_key:
+                proveedor_elegido = prov_by_id[prov_key]
+                # Embebido: solo nombre_empresa + telefono. Nunca el _id real.
+                proveedor_embed = {
+                    "nombre_empresa": proveedor_elegido.nombre_empresa,
+                    "telefono": proveedor_elegido.telefono,
+                }
                 if st.session_state.modo_form == "editar":
                     sede_svc.actualizar(st.session_state.id_edicion, {
                         "nombre_sede": nombre_sede, "ubicacion": ubicacion,
                         "capacidad_maxima": int(capacidad), "cupos_disponibles": int(cupos),
                         "horario_atencion": horario, "estado_activo": activo_sede,
-                        "proveedor_id": ObjectId(prov_id)
+                        "proveedor_id": proveedor_embed
                     })
                     st.success("Sede actualizada")
                 else:
                     s = Sede(nombre_sede, ubicacion, int(capacidad), activo_sede,
-                             ObjectId(prov_id), cupos_disponibles=int(cupos), horario_atencion=horario)
+                             cupos_disponibles=int(cupos), horario_atencion=horario,
+                             proveedor_id=proveedor_embed)
                     sede_svc.insertar(s)
                     st.success("Sede guardada")
                 limpiar_edit()
@@ -365,7 +387,6 @@ def form_sede(proveedores_lista):
                 st.rerun()
         if cols[1].form_submit_button("Cancelar"):
             cancelar_form()
-
 
 def form_estudiante():
     tit = "Editar estudiante" if st.session_state.modo_form == "editar" else "Nuevo estudiante"
@@ -695,19 +716,29 @@ def seccion_sedes():
         cap_total = res[0]["total"] if res else 0
         render_stat_card("users", cap_total, "Capacidad total", "#C9A227")
 
-    prov_lookup = {str(p._id): p.nombre_empresa for p in proveedores_lista}
+    if st.session_state.show_form:
+        form_sede(proveedores_lista)
+    else:
+        if st.button("+ Agregar sede", key="btn_agregar_sede", type="primary"):
+            limpiar_edit()
+            st.session_state.modo_form = "crear"
+            st.session_state.show_form = True
+            st.rerun()
+
     render_tabla(
         todos,
         [("Sede", 2, "nombre_sede"), ("Ubicación", 1, "ubicacion"),
-         ("Capacidad", 1, "capacidad_maxima"), ("Activa", 1, "estado_activo")],
-        "_id", sede_svc, seccion_key="sedes"
+         ("Capacidad", 1, "capacidad_maxima"), ("Proveedor", 2, "proveedor_id"),
+         ("Activa", 1, "estado_activo")],
+        "_id", sede_svc,
+        display_map={"proveedor_id": "nombre_empresa"},
+        seccion_key="sedes"
     )
 
     nueva_pagina = render_paginacion(total, pagina, "sedes")
     if nueva_pagina != pagina:
         st.session_state.pag_sedes = nueva_pagina
         st.rerun()
-
 
 def seccion_estudiantes():
     st.markdown('<h2 style="margin-bottom:4px;">Estudiantes</h2>', unsafe_allow_html=True)
@@ -957,7 +988,6 @@ else:
         "Consumos": seccion_consumos,
         "Menús": seccion_menus,
         "Evaluaciones": seccion_evaluaciones,
-        "Terminal": seccion_terminal,
     }
     if st.session_state.seccion in secciones:
         secciones[st.session_state.seccion]()
