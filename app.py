@@ -1,4 +1,5 @@
 import streamlit as st
+from seccion_terminal import seccion_terminal
 from datetime import datetime
 from bson import ObjectId
 from models import Proveedor, Sede, Estudiante, Consumo, Menu, Evaluacion, crear_colecciones
@@ -108,7 +109,7 @@ if "accion" in qp:
     st.rerun()
 
 # ── Sidebar ──
-_opciones_nav = ["Proveedores", "Sedes", "Estudiantes", "Consumos", "Menús", "Evaluaciones"]
+_opciones_nav = ["Proveedores", "Sedes", "Estudiantes", "Consumos", "Menús", "Evaluaciones", "Terminal"]
 _idx_default = 0
 if "_seccion_pendiente" in st.session_state:
     pendiente = st.session_state.pop("_seccion_pendiente")
@@ -1018,6 +1019,7 @@ else:
         "Consumos": seccion_consumos,
         "Menús": seccion_menus,
         "Evaluaciones": seccion_evaluaciones,
+        "Terminal": seccion_terminal,
     }
     if st.session_state.seccion in secciones:
         secciones[st.session_state.seccion]()
