@@ -31,7 +31,6 @@ _INIT = {
     "pag_consumos": 1,
     "pag_menus": 1,
     "pag_evaluaciones": 1,
-    "consumo_estudiante": None,
 }
 for k, v in _INIT.items():
     if k not in st.session_state:
@@ -149,7 +148,6 @@ if st.session_state._prev_seccion is not None and st.session_state._prev_seccion
     st.session_state.modo_form = "crear"
     st.session_state.id_edicion = None
     st.session_state.confirmar_eliminar = None
-    st.session_state["consumo_estudiante"] = None
     st.session_state.pag_proveedores = 1
     st.session_state.pag_sedes = 1
     st.session_state.pag_estudiantes = 1
@@ -175,7 +173,6 @@ def cancelar_form():
     st.session_state.show_form = False
     st.session_state.modo_form = "crear"
     st.session_state.id_edicion = None
-    st.session_state["consumo_estudiante"] = None
     limpiar_edit()
     st.rerun()
 
@@ -255,12 +252,10 @@ def render_tabla(items, cols_def, id_field, servicio, lookup=None, seccion_key="
         cells = "".join(f"<td>{fmt(item, c[2])}</td>" for c in cols_def)
         edit_link = (
             f'<a class="row-icon icon-edit" href="?accion=editar&sec={seccion_key}&id={cid}" '
-            f'onclick="window.top.location.href=\'?accion=editar&sec={seccion_key}&id={cid}\';return false;" '
             f'title="Editar"><i class="fas fa-pen"></i></a>'
         )
         del_link = (
             f'<a class="row-icon icon-delete" href="?accion=eliminar&sec={seccion_key}&id={cid}" '
-            f'onclick="window.top.location.href=\'?accion=eliminar&sec={seccion_key}&id={cid}\';return false;" '
             f'title="Eliminar"><i class="fas fa-trash"></i></a>'
         )
         rows_html += f'<tr>{cells}<td class="cell-icon">{edit_link}</td><td class="cell-icon">{del_link}</td></tr>'
@@ -319,26 +314,10 @@ def form_proveedor():
 
 def form_sede(proveedores_lista):
     tit = "Editar sede" if st.session_state.modo_form == "editar" else "Nueva sede"
-
-    # Las opciones del selector usan el _id real del proveedor SOLO como
-    # clave interna del widget (para que Streamlit identifique la opción
-    # elegida). Ese _id nunca se guarda en Sede; solo se copian
-    # nombre_empresa y telefono al embebido.
     prov_opts = {str(p._id): p.nombre_empresa for p in proveedores_lista}
-    prov_by_id = {str(p._id): p for p in proveedores_lista}
+    edit_prov_str = str(st.session_state.get("edit_proveedor_id", ""))
     prov_keys = list(prov_opts.keys())
-
-    # En modo edición, edit_proveedor_id llega como el DICT embebido
-    # {nombre_empresa, telefono}, no como un _id. Buscamos el proveedor
-    # actual por nombre_empresa para preseleccionarlo en el selectbox.
-    edit_prov_embed = st.session_state.get("edit_proveedor_id", {})
-    edit_nombre_empresa = edit_prov_embed.get("nombre_empresa") if isinstance(edit_prov_embed, dict) else None
-    default_idx = 0
-    if edit_nombre_empresa:
-        for i, k in enumerate(prov_keys):
-            if prov_opts[k] == edit_nombre_empresa:
-                default_idx = i
-                break
+    default_idx = prov_keys.index(edit_prov_str) if edit_prov_str in prov_keys else 0
 
     with st.form("form_sede"):
         st.markdown(
@@ -357,7 +336,7 @@ def form_sede(proveedores_lista):
         with c2:
             horario = st.text_input("Horario atención", value=st.session_state.get("edit_horario_atencion", ""))
             activo_sede = st.checkbox("Activa", value=st.session_state.get("edit_estado_activo", True))
-            prov_key = st.selectbox(
+            prov_id = st.selectbox(
                 "Proveedor", options=prov_keys,
                 format_func=lambda x: prov_opts[x],
                 index=default_idx
@@ -366,25 +345,18 @@ def form_sede(proveedores_lista):
         if cols[0].form_submit_button(
             "Guardar" if st.session_state.modo_form == "crear" else "Actualizar", type="primary"
         ):
-            if prov_key:
-                proveedor_elegido = prov_by_id[prov_key]
-                # Embebido: solo nombre_empresa + telefono. Nunca el _id real.
-                proveedor_embed = {
-                    "nombre_empresa": proveedor_elegido.nombre_empresa,
-                    "telefono": proveedor_elegido.telefono,
-                }
+            if prov_id:
                 if st.session_state.modo_form == "editar":
                     sede_svc.actualizar(st.session_state.id_edicion, {
                         "nombre_sede": nombre_sede, "ubicacion": ubicacion,
                         "capacidad_maxima": int(capacidad), "cupos_disponibles": int(cupos),
                         "horario_atencion": horario, "estado_activo": activo_sede,
-                        "proveedor_id": proveedor_embed
+                        "proveedor_id": ObjectId(prov_id)
                     })
                     st.success("Sede actualizada")
                 else:
                     s = Sede(nombre_sede, ubicacion, int(capacidad), activo_sede,
-                             cupos_disponibles=int(cupos), horario_atencion=horario,
-                             proveedor_id=proveedor_embed)
+                             ObjectId(prov_id), cupos_disponibles=int(cupos), horario_atencion=horario)
                     sede_svc.insertar(s)
                     st.success("Sede guardada")
                 limpiar_edit()
@@ -392,6 +364,7 @@ def form_sede(proveedores_lista):
                 st.rerun()
         if cols[1].form_submit_button("Cancelar"):
             cancelar_form()
+
 
 def form_estudiante():
     tit = "Editar estudiante" if st.session_state.modo_form == "editar" else "Nuevo estudiante"
@@ -418,7 +391,9 @@ def form_estudiante():
             fin = st.date_input("Fin subsidio")
             tipo = st.selectbox(
                 "Tipo almuerzo", ["Carnívoro", "Vegetariano"],
-                index=0 if st.session_state.get("edit_tipo_almuerzo", "Carnívoro").lower().startswith("carn") else 1
+                index=["Carnívoro", "Vegetariano"].index(
+                    st.session_state.get("edit_tipo_almuerzo", "Carnívoro")
+                )
             )
             activo_est = st.checkbox("Subsidio activo", value=st.session_state.get("edit_subsidio_activo", True))
         cols = st.columns(2)
@@ -451,23 +426,10 @@ def form_estudiante():
             cancelar_form()
 
 
-def form_consumo(sedes_lista):
+def form_consumo(estudiantes_lista, sedes_lista):
     tit = "Editar consumo" if st.session_state.modo_form == "editar" else "Nuevo consumo"
+    opts_est = {str(e._id): f"{e.nombre_completo} ({e.codigo_estudiante})" for e in estudiantes_lista}
     opts_sede = {str(s._id): s.nombre_sede for s in sedes_lista}
-
-    if st.session_state.modo_form == "editar" and "edit_estudiante_id" in st.session_state:
-        est_data = st.session_state["edit_estudiante_id"]
-        if isinstance(est_data, dict) and "codigo_estudiante" in est_data:
-            if st.session_state.get("consumo_estudiante") is None:
-                st.session_state["consumo_estudiante"] = {
-                    "_id": "",
-                    "codigo_estudiante": est_data.get("codigo_estudiante", ""),
-                    "nombre_completo": est_data.get("nombre_completo", ""),
-                    "tipo_almuerzo": est_data.get("tipo_almuerzo", "Carnívoro"),
-                }
-                st.session_state["edit_codigo_buscar"] = est_data.get("codigo_estudiante", "")
-
-    estudiante_encontrado = st.session_state.get("consumo_estudiante", None)
 
     with st.form("form_consumo"):
         st.markdown(
@@ -477,45 +439,10 @@ def form_consumo(sedes_lista):
         )
         c1, c2 = st.columns(2)
         with c1:
-            codigo_buscar = st.text_input(
-                "Código del estudiante",
-                value=st.session_state.get("edit_codigo_buscar", ""),
-                placeholder="Ej: 2024101001"
-            )
-            buscar_click = st.form_submit_button("Buscar estudiante", type="secondary")
-            if buscar_click and codigo_buscar:
-                st.session_state["edit_codigo_buscar"] = codigo_buscar
-                docs = list(estudiante_svc.coleccion.find(
-                    {"codigo_estudiante": {"$regex": codigo_buscar, "$options": "i"}}
-                ).limit(1))
-                if docs:
-                    e = Estudiante.from_dict(docs[0])
-                    st.session_state["consumo_estudiante"] = {
-                        "_id": str(e._id),
-                        "codigo_estudiante": e.codigo_estudiante,
-                        "nombre_completo": e.nombre_completo,
-                        "tipo_almuerzo": e.tipo_almuerzo or "Carnívoro",
-                    }
-                    st.rerun()
-                else:
-                    st.session_state["consumo_estudiante"] = None
-                    st.error("Estudiante no encontrado")
-
-            if estudiante_encontrado:
-                st.markdown(
-                    f'<p style="color:#0B2545;font-weight:600;margin-top:4px;">'
-                    f'<i class="fas fa-check-circle" style="color:#C9A227;"></i> '
-                    f'{estudiante_encontrado["nombre_completo"]} '
-                    f'({estudiante_encontrado["codigo_estudiante"]})</p>',
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    '<p style="color:#5C6470;font-size:13px;margin-top:4px;">'
-                    'Busca un estudiante por su código</p>',
-                    unsafe_allow_html=True
-                )
-
+            est_id_key = st.selectbox(
+                "Estudiante", options=list(opts_est.keys()),
+                format_func=lambda x: opts_est[x]
+            ) if opts_est else None
             sede_id_key = st.selectbox(
                 "Sede", options=list(opts_sede.keys()),
                 format_func=lambda x: opts_sede[x]
@@ -528,29 +455,18 @@ def form_consumo(sedes_lista):
         if cols[0].form_submit_button(
             "Guardar" if st.session_state.modo_form == "crear" else "Actualizar", type="primary"
         ):
-            if estudiante_encontrado and sede_id_key:
-                sede_doc = sede_svc.obtener_por_id(sede_id_key)
-                embed_estudiante = {
-                    "nombre_completo": estudiante_encontrado["nombre_completo"],
-                    "codigo_estudiante": estudiante_encontrado["codigo_estudiante"],
-                    "tipo_almuerzo": estudiante_encontrado["tipo_almuerzo"],
-                }
-                embed_sede = {
-                    "nombre_sede": opts_sede[sede_id_key],
-                    "ubicacion": sede_doc.ubicacion if sede_doc else "",
-                }
+            if est_id_key and sede_id_key:
                 if st.session_state.modo_form == "editar":
                     consumo_svc.actualizar(st.session_state.id_edicion, {
-                        "estudiante_id": embed_estudiante,
-                        "sede_id": embed_sede,
+                        "estudiante_id": ObjectId(est_id_key),
+                        "sede_id": ObjectId(sede_id_key),
                         "fecha_consumo": datetime.combine(fecha, datetime.min.time()),
-                        "hora_ingreso": hora,
-                        "validacion_identidad": validado,
+                        "hora_ingreso": hora, "validacion_identidad": validado
                     })
                     st.success("Consumo actualizado")
                 else:
                     c = Consumo(
-                        embed_estudiante, embed_sede,
+                        ObjectId(est_id_key), ObjectId(sede_id_key),
                         datetime.combine(fecha, datetime.min.time()),
                         validado, hora_ingreso=hora
                     )
@@ -558,7 +474,6 @@ def form_consumo(sedes_lista):
                     st.success("Consumo guardado")
                 limpiar_edit()
                 st.session_state.show_form = False
-                st.session_state["consumo_estudiante"] = None
                 st.rerun()
         if cols[1].form_submit_button("Cancelar"):
             cancelar_form()
@@ -779,29 +694,19 @@ def seccion_sedes():
         cap_total = res[0]["total"] if res else 0
         render_stat_card("users", cap_total, "Capacidad total", "#C9A227")
 
-    if st.session_state.show_form:
-        form_sede(proveedores_lista)
-    else:
-        if st.button("+ Agregar sede", key="btn_agregar_sede", type="primary"):
-            limpiar_edit()
-            st.session_state.modo_form = "crear"
-            st.session_state.show_form = True
-            st.rerun()
-
+    prov_lookup = {str(p._id): p.nombre_empresa for p in proveedores_lista}
     render_tabla(
         todos,
         [("Sede", 2, "nombre_sede"), ("Ubicación", 1, "ubicacion"),
-         ("Capacidad", 1, "capacidad_maxima"), ("Proveedor", 2, "proveedor_id"),
-         ("Activa", 1, "estado_activo")],
-        "_id", sede_svc,
-        display_map={"proveedor_id": "nombre_empresa"},
-        seccion_key="sedes"
+         ("Capacidad", 1, "capacidad_maxima"), ("Activa", 1, "estado_activo")],
+        "_id", sede_svc, seccion_key="sedes"
     )
 
     nueva_pagina = render_paginacion(total, pagina, "sedes")
     if nueva_pagina != pagina:
         st.session_state.pag_sedes = nueva_pagina
         st.rerun()
+
 
 def seccion_estudiantes():
     st.markdown('<h2 style="margin-bottom:4px;">Estudiantes</h2>', unsafe_allow_html=True)
@@ -902,8 +807,9 @@ def seccion_consumos():
         )
 
     if st.session_state.show_form:
+        estudiantes_lista = estudiante_svc.obtener_todos()
         sedes_lista = sede_svc.obtener_todos()
-        form_consumo(sedes_lista)
+        form_consumo(estudiantes_lista, sedes_lista)
     else:
         if st.button("+ Agregar consumo", key="btn_agregar_consumo", type="primary"):
             limpiar_edit()
